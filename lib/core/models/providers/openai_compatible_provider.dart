@@ -18,11 +18,10 @@ import '../model_provider.dart';
 class OpenAiCompatibleProvider implements ModelProvider {
   OpenAiCompatibleProvider({
     required this.config,
-    required SecretsStore secretsStore,
+    required this._secretsStore,
     http.Client? httpClient,
     this.maxRetries = 3,
-  })  : _secretsStore = secretsStore,
-        _http = httpClient ?? http.Client();
+  })  : _http = httpClient ?? http.Client();
 
   @override
   String get providerId => config.providerId;

@@ -1,6 +1,4 @@
-import 'package:http/http.dart' as http;
 
-import '../../security/secrets_store.dart';
 import '../model_capabilities.dart';
 import '../model_provider.dart';
 import 'openai_compatible_provider.dart';
@@ -12,18 +10,16 @@ import 'openai_compatible_provider.dart';
 /// Groq's own docs (`https://api.groq.com/openai/v1`).
 class GroqProvider extends OpenAiCompatibleProvider {
   GroqProvider({
-    required SecretsStore secretsStore,
+    required super.secretsStore,
     String apiKeySecretRef = 'groq_api_key',
     Uri? baseUrl,
-    http.Client? httpClient,
+    super.httpClient,
   }) : super(
           config: ProviderConfig(
             providerId: 'groq',
             baseUrl: baseUrl ?? Uri.parse('https://api.groq.com/openai/v1/'),
             apiKeySecretRef: apiKeySecretRef,
           ),
-          secretsStore: secretsStore,
-          httpClient: httpClient,
         );
 
   @override
@@ -40,18 +36,16 @@ class GroqProvider extends OpenAiCompatibleProvider {
 /// Cerebras's own OpenAI-compatibility docs.
 class CerebrasProvider extends OpenAiCompatibleProvider {
   CerebrasProvider({
-    required SecretsStore secretsStore,
+    required super.secretsStore,
     String apiKeySecretRef = 'cerebras_api_key',
     Uri? baseUrl,
-    http.Client? httpClient,
+    super.httpClient,
   }) : super(
           config: ProviderConfig(
             providerId: 'cerebras',
             baseUrl: baseUrl ?? Uri.parse('https://api.cerebras.ai/v1/'),
             apiKeySecretRef: apiKeySecretRef,
           ),
-          secretsStore: secretsStore,
-          httpClient: httpClient,
         );
 
   @override
@@ -65,10 +59,10 @@ class CerebrasProvider extends OpenAiCompatibleProvider {
 /// domain per the spec's "OpenRouter" fallback tier.
 class OpenRouterProvider extends OpenAiCompatibleProvider {
   OpenRouterProvider({
-    required SecretsStore secretsStore,
+    required super.secretsStore,
     String apiKeySecretRef = 'openrouter_api_key',
     Uri? baseUrl,
-    http.Client? httpClient,
+    super.httpClient,
   }) : super(
           config: ProviderConfig(
             providerId: 'openrouter',
@@ -81,8 +75,6 @@ class OpenRouterProvider extends OpenAiCompatibleProvider {
               'X-Title': 'Forge',
             },
           ),
-          secretsStore: secretsStore,
-          httpClient: httpClient,
         );
 
   @override
@@ -103,18 +95,16 @@ class OpenRouterProvider extends OpenAiCompatibleProvider {
 /// via the `baseUrl` constructor parameter when applicable.
 class ZaiProvider extends OpenAiCompatibleProvider {
   ZaiProvider({
-    required SecretsStore secretsStore,
+    required super.secretsStore,
     String apiKeySecretRef = 'zai_api_key',
     Uri? baseUrl,
-    http.Client? httpClient,
+    super.httpClient,
   }) : super(
           config: ProviderConfig(
             providerId: 'zai',
             baseUrl: baseUrl ?? Uri.parse('https://api.z.ai/api/paas/v4/'),
             apiKeySecretRef: apiKeySecretRef,
           ),
-          secretsStore: secretsStore,
-          httpClient: httpClient,
         );
 
   @override
@@ -134,18 +124,16 @@ class ZaiProvider extends OpenAiCompatibleProvider {
 /// which the Model Registry's empirical scoring will surface if it matters.
 class GoogleProvider extends OpenAiCompatibleProvider {
   GoogleProvider({
-    required SecretsStore secretsStore,
+    required super.secretsStore,
     String apiKeySecretRef = 'google_api_key',
     Uri? baseUrl,
-    http.Client? httpClient,
+    super.httpClient,
   }) : super(
           config: ProviderConfig(
             providerId: 'google',
             baseUrl: baseUrl ?? Uri.parse('https://generativelanguage.googleapis.com/v1beta/openai/'),
             apiKeySecretRef: apiKeySecretRef,
           ),
-          secretsStore: secretsStore,
-          httpClient: httpClient,
         );
 
   @override

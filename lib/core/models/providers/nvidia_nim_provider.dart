@@ -1,6 +1,4 @@
-import 'package:http/http.dart' as http;
 
-import '../../security/secrets_store.dart';
 import '../model_capabilities.dart';
 import '../model_provider.dart';
 import 'openai_compatible_provider.dart';
@@ -13,18 +11,16 @@ import 'openai_compatible_provider.dart';
 /// includes on some model listings.
 class NvidiaNimProvider extends OpenAiCompatibleProvider {
   NvidiaNimProvider({
-    required SecretsStore secretsStore,
+    required super.secretsStore,
     Uri? baseUrl,
     String apiKeySecretRef = 'nvidia_nim_api_key',
-    http.Client? httpClient,
+    super.httpClient,
   }) : super(
           config: ProviderConfig(
             providerId: 'nvidia-nim',
             baseUrl: baseUrl ?? Uri.parse('https://integrate.api.nvidia.com/v1/'),
             apiKeySecretRef: apiKeySecretRef,
           ),
-          secretsStore: secretsStore,
-          httpClient: httpClient,
         );
 
   /// Curated capability overrides for the NVIDIA-hosted models Forge treats

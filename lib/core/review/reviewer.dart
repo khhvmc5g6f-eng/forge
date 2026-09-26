@@ -53,10 +53,10 @@ const _reviewerSystemPrompt =
 /// identical; only which [ModelProvider]/model is passed in differs.
 class ModelReviewer implements Reviewer {
   ModelReviewer({
-    required String reviewerId,
+    required this._reviewerId,
     required this.provider,
     required this.modelName,
-  }) : _reviewerId = reviewerId;
+  });
 
   final String _reviewerId;
   final ModelProvider provider;

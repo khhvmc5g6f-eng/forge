@@ -16,15 +16,13 @@ import '../model_provider.dart';
 /// Reviewer (see core/review/reviewer.dart).
 class AnthropicProvider implements ModelProvider {
   AnthropicProvider({
-    required SecretsStore secretsStore,
+    required this._secretsStore,
     Uri? baseUrl,
-    String apiKeySecretRef = 'anthropic_api_key',
+    this._apiKeySecretRef = 'anthropic_api_key',
     http.Client? httpClient,
     this.apiVersion = '2023-06-01',
     this.maxRetries = 3,
-  })  : _secretsStore = secretsStore,
-        _baseUrl = baseUrl ?? Uri.parse('https://api.anthropic.com/v1/'),
-        _apiKeySecretRef = apiKeySecretRef,
+  })  : _baseUrl = baseUrl ?? Uri.parse('https://api.anthropic.com/v1/'),
         _http = httpClient ?? http.Client();
 
   @override
@@ -82,7 +80,7 @@ class AnthropicProvider implements ModelProvider {
     return {
       'Content-Type': 'application/json',
       'anthropic-version': apiVersion,
-      if (key != null) 'x-api-key': key,
+      'x-api-key': ?key,
     };
   }
 

@@ -64,12 +64,10 @@ class McpServerConnection {
 class McpBridgeTool implements Tool {
   McpBridgeTool({
     required this.serverId,
-    required McpToolDescriptor descriptor,
-    required McpClient client,
-    ToolCategory category = ToolCategory.mcp,
-  })  : _descriptor = descriptor,
-        _client = client,
-        _category = category;
+    required this._descriptor,
+    required this._client,
+    this._category = ToolCategory.mcp,
+  });
 
   final String serverId;
   final McpToolDescriptor _descriptor;

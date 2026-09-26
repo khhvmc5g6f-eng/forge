@@ -44,10 +44,9 @@ class TerminalTool implements Tool {
   TerminalTool({
     required this.workingDirectory,
     required this.agentId,
-    TerminalLog? log,
+    this._log,
     CommandClassifier? classifier,
-  })  : _log = log,
-        _classifier = classifier ?? CommandClassifier();
+  })  : _classifier = classifier ?? CommandClassifier();
 
   final String workingDirectory;
   final String agentId;

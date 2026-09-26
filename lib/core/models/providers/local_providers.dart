@@ -1,6 +1,4 @@
-import 'package:http/http.dart' as http;
 
-import '../../security/secrets_store.dart';
 import '../model_capabilities.dart';
 import '../model_provider.dart';
 import 'openai_compatible_provider.dart';
@@ -9,16 +7,14 @@ import 'openai_compatible_provider.dart';
 /// required; treated as free and local for routing purposes.
 class OllamaProvider extends OpenAiCompatibleProvider {
   OllamaProvider({
-    required SecretsStore secretsStore,
+    required super.secretsStore,
     Uri? baseUrl,
-    http.Client? httpClient,
+    super.httpClient,
   }) : super(
           config: ProviderConfig(
             providerId: 'ollama',
             baseUrl: baseUrl ?? Uri.parse('http://localhost:11434/v1/'),
           ),
-          secretsStore: secretsStore,
-          httpClient: httpClient,
         );
 
   @override
@@ -30,16 +26,14 @@ class OllamaProvider extends OpenAiCompatibleProvider {
 /// Local LM Studio server (default `http://localhost:1234/v1/`).
 class LmStudioProvider extends OpenAiCompatibleProvider {
   LmStudioProvider({
-    required SecretsStore secretsStore,
+    required super.secretsStore,
     Uri? baseUrl,
-    http.Client? httpClient,
+    super.httpClient,
   }) : super(
           config: ProviderConfig(
             providerId: 'lm-studio',
             baseUrl: baseUrl ?? Uri.parse('http://localhost:1234/v1/'),
           ),
-          secretsStore: secretsStore,
-          httpClient: httpClient,
         );
 
   @override
@@ -64,17 +58,15 @@ class GenericOpenAiCompatibleProvider extends OpenAiCompatibleProvider {
 /// Official OpenAI API.
 class OpenAiProvider extends OpenAiCompatibleProvider {
   OpenAiProvider({
-    required SecretsStore secretsStore,
+    required super.secretsStore,
     String apiKeySecretRef = 'openai_api_key',
     Uri? baseUrl,
-    http.Client? httpClient,
+    super.httpClient,
   }) : super(
           config: ProviderConfig(
             providerId: 'openai',
             baseUrl: baseUrl ?? Uri.parse('https://api.openai.com/v1/'),
             apiKeySecretRef: apiKeySecretRef,
           ),
-          secretsStore: secretsStore,
-          httpClient: httpClient,
         );
 }

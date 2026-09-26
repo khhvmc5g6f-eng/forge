@@ -67,7 +67,7 @@ class GitService {
   }
 
   Future<String> diff({String? path, bool staged = false}) async {
-    final args = ['diff', if (staged) '--staged', if (path != null) '--', if (path != null) path];
+    final args = ['diff', if (staged) '--staged', if (path != null) '--', ?path];
     return (await _run(args)).stdout;
   }
 
@@ -80,7 +80,7 @@ class GitService {
   }
 
   Future<void> createBranch(String name, {String? fromRef}) async {
-    await _run(['checkout', '-b', name, if (fromRef != null) fromRef]);
+    await _run(['checkout', '-b', name, ?fromRef]);
   }
 
   Future<void> checkout(String ref) async => _run(['checkout', ref]);
@@ -119,7 +119,7 @@ class GitService {
   /// new branch [branchName], per the brief's "autonomous work should
   /// normally occur in isolated branches/worktrees".
   Future<void> createWorktree(String worktreePath, String branchName, {String? fromRef}) async {
-    await _run(['worktree', 'add', '-b', branchName, worktreePath, if (fromRef != null) fromRef]);
+    await _run(['worktree', 'add', '-b', branchName, worktreePath, ?fromRef]);
   }
 
   Future<void> removeWorktree(String worktreePath) async {
