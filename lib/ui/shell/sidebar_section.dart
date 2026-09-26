@@ -15,6 +15,7 @@ enum SidebarSection {
   models(Icons.memory_outlined, 'Models'),
   controlCentre(Icons.hub, 'Control Centre'),
   memory(Icons.psychology_outlined, 'Memory'),
+  neuralLab(Icons.science_outlined, 'Neural Lab'),
   diagnostics(Icons.monitor_heart_outlined, 'Diagnostics'),
   settings(Icons.settings_outlined, 'Settings');
 

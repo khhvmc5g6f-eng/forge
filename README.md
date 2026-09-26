@@ -66,6 +66,21 @@ verification against real external services:
   dispatches dependency-aware parallel worker nodes, fails a node over to the next healthy
   same-tier model on infrastructure failure, and reconciles conflicting worker results
   without averaging — all wired into a live Control Centre UI panel.
+- **Neural Lab** (`lib/ui/panels/neural_lab/`, `lib/core/neural/`) — a native, live 3D
+  visualisation of a neural network *actually learning*, ported from the MLclass
+  `live-3d-nn` web lab into the Forge shell: a from-scratch pure-Dart MLP engine
+  (tanh/ReLU, sigmoid output, BCE loss, Adam/SGD, raw or engineered input features)
+  training live on the classic 2D datasets (spiral, moons, circles, XOR, gaussians), with
+  cyan forward-pass pulse waves, **orange backward waves that show the real per-edge
+  gradients ∂L/∂w** (edges re-colour by gradient magnitude while the wave flows), a live
+  decision-surface plane, and a full analytics dock (train/test loss curves with a
+  log-scale toggle, decision-boundary map, per-layer gradient bars, confusion matrix with
+  precision/recall, and a text training-phase chip: idle/learning/converged/plateaued/
+  overfit/diverging). The 3D view is a zero-dependency perspective renderer
+  (`CustomPainter`) with orbit/pinch/scroll controls; the layout adapts between desktop
+  (side dock) and phone (stacked). Engine correctness is test-enforced: numerical
+  gradient check against backprop plus convergence thresholds on every dataset
+  (`test/core/neural/mlp_engine_test.dart`).
 
 **What's still a documented stub, not faked data**: the macOS Accessibility driver behind
 computer-use (needs a real macOS host + Xcode to implement and verify — see

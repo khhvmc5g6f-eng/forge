@@ -10,6 +10,7 @@ import '../panels/git_panel.dart';
 import '../panels/mcp_panel.dart';
 import '../panels/memory_panel.dart';
 import '../panels/models_panel.dart';
+import '../panels/neural_lab/neural_lab_panel.dart';
 import '../panels/projects_panel.dart';
 import '../panels/settings_panel.dart';
 import '../panels/tasks_panel.dart';
@@ -104,6 +105,8 @@ class ForgeShell extends ConsumerWidget {
         return const ControlCentrePanel();
       case SidebarSection.memory:
         return const MemoryPanel();
+      case SidebarSection.neuralLab:
+        return const NeuralLabPanel();
       case SidebarSection.diagnostics:
         return const DiagnosticsPanel();
       case SidebarSection.settings:
