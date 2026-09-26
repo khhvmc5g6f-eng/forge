@@ -23,6 +23,7 @@ import '../core/models/providers/additional_providers.dart';
 import '../core/models/providers/anthropic_provider.dart';
 import '../core/models/providers/local_providers.dart';
 import '../core/models/providers/nvidia_nim_provider.dart';
+import '../core/security/keychain_secrets_store.dart';
 import '../core/security/secrets_store.dart';
 import '../core/tasks/task_manager.dart';
 import '../core/tasks/task_store.dart';
@@ -45,10 +46,17 @@ final permissionLevelProvider =
     StateProvider<PermissionLevel>((ref) => PermissionLevel.proposeEdits);
 final routingPolicyProvider = StateProvider<RoutingPolicy>((ref) => RoutingPolicy.auto);
 
-/// Real, in-process secure secret storage. Swapped for [KeychainSecretsStore]
-/// automatically once running on macOS with the platform channel wired up —
-/// see PROVIDERS.md#secrets.
-final secretsStoreProvider = Provider<SecretsStore>((ref) => InMemorySecretsStore());
+/// Secure secret storage. Uses the real macOS Keychain-backed
+/// [KeychainSecretsStore] when running as a desktop app on macOS; falls back
+/// to [InMemorySecretsStore] in unit tests (no platform channel) and on
+/// hosts without secure storage. See PROVIDERS.md#secrets.
+final secretsStoreProvider = Provider<SecretsStore>((ref) {
+  final inTestEnv = Platform.environment.containsKey('FLUTTER_TEST');
+  if (!inTestEnv && Platform.isMacOS) {
+    return KeychainSecretsStore(serviceName: 'app.forge.secrets');
+  }
+  return InMemorySecretsStore();
+});
 
 final gitServiceProvider = Provider<GitService>((ref) {
   return GitService(repositoryRoot: ref.watch(projectRootProvider));
@@ -141,6 +149,13 @@ final terminalToolProvider = Provider<TerminalTool>((ref) {
   return TerminalTool(
     workingDirectory: ref.watch(projectRootProvider),
     agentId: 'user',
+    // Defense-in-depth: a hard `deny` from the Policy Engine is enforced at
+    // the tool itself, not only at the Tool Gateway.
+    policyEngine: ref.watch(policyEngineProvider),
+    // Contain novel/unrecognised commands on macOS: Seatbelt denies file
+    // writes outside the project root even if the rule-based classifier
+    // mis-judges a command's risk.
+    useSeatbelt: Platform.isMacOS,
     log: (record) {
       final list = [...ref.read(terminalHistoryProvider)];
       final idx = list.indexWhere((r) => identical(r, record));

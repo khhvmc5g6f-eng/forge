@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:forge/core/agents/agent_role.dart';
 import 'package:forge/core/agents/orchestrator.dart';
 import 'package:forge/core/models/model_capabilities.dart';
+import 'package:forge/core/models/model_provider.dart';
 import 'package:forge/core/models/model_registry.dart';
 import 'package:forge/core/models/model_router.dart';
 import 'package:forge/core/security/untrusted_content.dart';
@@ -93,12 +94,56 @@ void main() {
       ..enqueue(textResponse('r2'))
       ..enqueue(textResponse('r3'));
     final orchestrator = newOrchestrator(budget: const SubagentBudget(maxConcurrency: 2));
-    final reports = await orchestrator.spawnParallel([
+    final result = await orchestrator.spawnParallel([
       const SubagentRequest(role: AgentRole.repository, prompt: 'a'),
       const SubagentRequest(role: AgentRole.repository, prompt: 'b'),
       const SubagentRequest(role: AgentRole.repository, prompt: 'c'),
     ]);
-    expect(reports.map((r) => r.finalMessage), containsAll(['r1', 'r2', 'r3']));
+    expect(result.reports.map((r) => r.finalMessage), containsAll(['r1', 'r2', 'r3']));
+    expect(result.allSucceeded, isTrue);
+  });
+
+  test('spawnParallel keeps partial results when one agent fails', () async {
+    provider
+      ..enqueue(textResponse('ok'))
+      ..enqueueError()
+      ..enqueue(textResponse('ok too'));
+    final outcomes = <(ModelId, Object?)>[];
+    final orchestrator = AgentOrchestrator(
+      registry: registry,
+      router: router,
+      resolveProvider: (_) => provider,
+      gatewayFor: (_) => newGateway(),
+      onModelOutcome: (modelId, error) => outcomes.add((modelId, error)),
+    );
+    final result = await orchestrator.spawnParallel([
+      const SubagentRequest(role: AgentRole.repository, prompt: 'a'),
+      const SubagentRequest(role: AgentRole.repository, prompt: 'b'),
+      const SubagentRequest(role: AgentRole.repository, prompt: 'c'),
+    ]);
+    expect(result.reports, hasLength(2));
+    expect(result.failures, hasLength(1));
+    expect(result.allSucceeded, isFalse);
+    // The failed agent's outcome was still reported to the circuit-breaker
+    // feed: two successes (null error) and one failure.
+    expect(outcomes.where((o) => o.$2 == null), hasLength(2));
+    expect(outcomes.where((o) => o.$2 != null), hasLength(1));
+  });
+
+  test('spawnParallel stops dispatching new batches after cancel()', () async {
+    provider
+      ..enqueue(textResponse('r1'))
+      ..enqueue(textResponse('r2'));
+    final orchestrator = newOrchestrator(budget: const SubagentBudget(maxConcurrency: 1));
+    final future = orchestrator.spawnParallel([
+      const SubagentRequest(role: AgentRole.repository, prompt: 'a'),
+      const SubagentRequest(role: AgentRole.repository, prompt: 'b'),
+    ]);
+    // Cancel after the first single-agent batch is dispatched.
+    orchestrator.cancel();
+    final result = await future;
+    expect(result.reports, hasLength(1));
+    expect(orchestrator.isCancelled, isTrue);
   });
 
   test('agent runtime executes a tool call before finishing', () async {

@@ -20,9 +20,19 @@ class FakeModelProvider implements ModelProvider {
 
   void enqueue(ChatCompletionResult response) => _responses.add(response);
 
+  /// Queues a failure: the next `chat` call throws [error] instead of
+  /// returning a response. Consumes one slot, like [enqueue].
+  void enqueueError([Object? error]) =>
+      _errors.add(error ?? ModelProviderException('scripted failure'));
+
+  final List<Object> _errors = [];
+
   @override
   Future<ChatCompletionResult> chat(String modelName, ChatRequest request) async {
     receivedRequests.add(request);
+    if (_errors.isNotEmpty) {
+      throw _errors.removeAt(0);
+    }
     if (_cursor >= _responses.length) {
       throw StateError('FakeModelProvider($_providerId) ran out of scripted responses.');
     }

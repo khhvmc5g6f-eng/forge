@@ -57,12 +57,17 @@ raises convenience, never the security ceiling.
 
 API keys are never written to project files, Git, or plain JSON. `SecretsStore`
 (`lib/core/security/secrets_store.dart`) is the only place a credential is read/written;
-`KeychainSecretsStore` is the macOS production backend (backed by
-`flutter_secure_storage`'s Keychain integration once wired into the macOS Runner target —
-this repository documents but does not yet vendor that platform-channel setup, since it
-cannot be built or verified outside a real macOS + Xcode host). `InMemorySecretsStore` is
-used in this development/CI environment and in tests, and must never hold a real
-production credential.
+`KeychainSecretsStore` (`lib/core/security/keychain_secrets_store.dart`) is the macOS
+production backend, implemented on `flutter_secure_storage`'s Keychain integration; the
+desktop shell selects it automatically on macOS outside of tests. `InMemorySecretsStore`
+is used in the unit-test environment and on hosts without secure storage, and must never
+hold a real production credential.
+
+Additionally, terminal commands execute on macOS under a Seatbelt (`sandbox-exec`)
+profile that denies file writes outside the project root (and permits /tmp), so even a
+command the rule-based classifier mis-judges cannot scribble outside the project. The
+Policy Engine's hard `deny` is also enforced inside `TerminalTool` itself as
+defense-in-depth, independent of the Tool Gateway.
 
 ## Isolation for autonomous work
 

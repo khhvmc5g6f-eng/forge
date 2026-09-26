@@ -93,6 +93,7 @@ class AgentOrchestrator {
   bool _cancelled = false;
 
   int get totalSpawned => _totalSpawned;
+  bool get isCancelled => _cancelled;
 
   void cancel() => _cancelled = true;
 
@@ -160,18 +161,63 @@ class AgentOrchestrator {
   /// [SubagentBudget.maxConcurrency]. Used for the brief's "Investigate why
   /// X" example: several independent investigations dispatched at once,
   /// results returned to the orchestrator together.
-  Future<List<AgentReport>> spawnParallel(
+  ///
+  /// One agent failing no longer aborts the whole batch: every request gets
+  /// to run, partial results are preserved, and per-request failures (already
+  /// reported through [onModelOutcome] inside [spawn], feeding circuit
+  /// breakers) are returned alongside the successful reports.
+  Future<ParallelSpawnResult> spawnParallel(
     List<SubagentRequest> requests, {
     int depth = 0,
   }) async {
-    final results = <AgentReport>[];
+    final reports = <AgentReport>[];
+    final failures = <SpawnFailure>[];
     for (var i = 0; i < requests.length; i += budget.maxConcurrency) {
+      if (_cancelled) {
+        // Stop dispatching new batches; already-running agents finish (or
+        // hit their timeout) but nothing further is spawned.
+        break;
+      }
       final batch = requests.skip(i).take(budget.maxConcurrency);
       final batchResults = await Future.wait(
-        batch.map((r) => spawn(r, depth: depth)),
+        batch.map((r) async {
+          try {
+            return await spawn(r, depth: depth);
+          } catch (e) {
+            return SpawnFailure._(r, e);
+          }
+        }),
       );
-      results.addAll(batchResults);
+      for (final result in batchResults) {
+        if (result is SpawnFailure) {
+          failures.add(result);
+        } else if (result is AgentReport) {
+          reports.add(result);
+        }
+      }
     }
-    return results;
+    return ParallelSpawnResult._(reports, failures);
   }
 }
+
+/// One failed request from a [AgentOrchestrator.spawnParallel] batch, with
+/// the error that killed it. [SpawnFailure.error] has already been reported
+/// through `onModelOutcome` (when wired), so circuit-breaker state stays
+/// accurate.
+class SpawnFailure {
+  SpawnFailure._(this.request, this.error);
+  final SubagentRequest request;
+  final Object error;
+}
+
+/// Outcome of a parallel spawn: successful reports plus per-request
+/// failures, so callers can reconcile partial results rather than losing
+/// everything on one agent's infrastructure failure.
+class ParallelSpawnResult {
+  ParallelSpawnResult._(this.reports, this.failures);
+  final List<AgentReport> reports;
+  final List<SpawnFailure> failures;
+
+  bool get allSucceeded => failures.isEmpty;
+}
+

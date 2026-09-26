@@ -69,9 +69,13 @@ verification against real external services:
 
 **What's still a documented stub, not faked data**: the macOS Accessibility driver behind
 computer-use (needs a real macOS host + Xcode to implement and verify — see
-`DEVELOPMENT.md`), and the macOS Keychain-backed `SecretsStore` (same constraint). Every
-other "not yet built" item from earlier drafts of this README has since been implemented —
-see the list above.
+`DEVELOPMENT.md`). The macOS Keychain-backed `SecretsStore` is now a real
+implementation (`lib/core/security/keychain_secrets_store.dart`, via `flutter_secure_storage`),
+wired automatically when the desktop app runs on macOS. Terminal commands now also run
+under a macOS Seatbelt (`sandbox-exec`) profile denying file writes outside the project
+root, and the Policy Engine's `deny` is enforced at `TerminalTool` itself as
+defense-in-depth. Every other "not yet built" item from earlier drafts of this README has
+since been implemented — see the list above.
 
 ## Running it
 

@@ -22,6 +22,22 @@ class CommandClassifier {
     _Rule(RegExp(r'\bmkfs\b'), CommandRisk.destructive),
     _Rule(RegExp(r'>\s*/dev/sd'), CommandRisk.destructive),
 
+    // Execution of remote/untrusted content: piping a download into a shell
+    // or interpreter is effectively arbitrary code execution and must never
+    // slide by as a mere "network" command.
+    _Rule(RegExp(r'\|\s*(sudo\s+)?(ba|z|da|k|a|fi)?sh\b'), CommandRisk.destructive),
+    _Rule(RegExp(r'\|\s*(python|python3|perl|ruby|node)\b'), CommandRisk.destructive),
+    _Rule(RegExp(r'\beval\b'), CommandRisk.destructive),
+    _Rule(RegExp(r'\bsource\s+\(?<(?:\(|\s)'), CommandRisk.destructive),
+
+    // Further disk/filesystem-destroying utilities that rm-only rules miss.
+    _Rule(RegExp(r'\bdd\b'), CommandRisk.destructive),
+    _Rule(RegExp(r'\bshred\b'), CommandRisk.destructive),
+    _Rule(RegExp(r'\bdiskutil\s+.*(erase|partition)'), CommandRisk.destructive),
+    _Rule(RegExp(r'\bgit\s+filter-branch\b'), CommandRisk.destructive),
+    _Rule(RegExp(r'\bgit\s+push\s+.*--delete\b'), CommandRisk.destructive),
+    _Rule(RegExp(r'\bgit\s+checkout\s+--'), CommandRisk.destructive),
+
     // Modify: state-changing but reversible via Git/checkpoint.
     _Rule(RegExp(r'\bgit\s+commit\b'), CommandRisk.modify),
     _Rule(RegExp(r'\bgit\s+push\b'), CommandRisk.modify),
