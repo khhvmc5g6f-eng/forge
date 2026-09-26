@@ -1,0 +1,29 @@
+name: forge
+description: "Forge — a standalone, provider-independent AI software-engineering workstation."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^2.6.1
+  http: ^1.2.2
+  uuid: ^4.5.1
+  path: ^1.9.0
+  args: ^2.6.0
+  meta: ^1.16.0
+  collection: ^1.19.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  mockito: ^5.4.5
+  build_runner: ^2.4.13
+
+flutter:
+  uses-material-design: true
