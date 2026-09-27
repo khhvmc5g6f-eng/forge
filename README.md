@@ -80,7 +80,10 @@ verification against real external services:
   (`CustomPainter`) with orbit/pinch/scroll controls; the layout adapts between desktop
   (side dock) and phone (stacked). Engine correctness is test-enforced: numerical
   gradient check against backprop plus convergence thresholds on every dataset
-  (`test/core/neural/mlp_engine_test.dart`).
+  (`test/core/neural/mlp_engine_test.dart`). The same lab also ships as a self-contained
+  **web export** (`web_lab/index.html`, served live from this repo's GitHub Pages at
+  https://khhvmc5g6f-eng.github.io/forge/) — one app, two delivery forms: native and
+  web, both engine-verified.
 
 **What's still a documented stub, not faked data**: the macOS Accessibility driver behind
 computer-use (needs a real macOS host + Xcode to implement and verify — see

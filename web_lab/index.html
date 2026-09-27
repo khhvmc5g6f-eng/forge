@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Forge · Neural Lab — live 3D</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: rgba(22, 27, 38, 0.82);
+    --panel-border: rgba(120, 140, 180, 0.16);
+    --text: #e8ecf4;
+    --text-dim: #8b95ab;
+    --accent: #3fd6ff;
+    --accent2: #ff7a3c;
+    --good: #34d399;
+    --bad: #f87171;
+    --font: -apple-system, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(1200px 800px at 70% -10%, #16203a 0%, var(--bg) 55%) var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app {
+    display: grid;
+    grid-template-rows: 52px auto 1fr 26px;
+    grid-template-columns: 1fr 348px;
+    grid-template-areas:
+      "header header"
+      "toolbar toolbar"
+      "stage sidebar"
+      "status status";
+    height: 100vh;
+  }
+  header {
+    grid-area: header;
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--panel-border);
+    background: var(--panel);
+    backdrop-filter: blur(14px);
+  }
+  header h1 { font-size: 15px; font-weight: 700; margin: 0; letter-spacing: 0.2px; }
+  header .sub { color: var(--text-dim); font-size: 12px; }
+  header .spacer { flex: 1; }
+  #toolbar {
+    grid-area: toolbar;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--panel-border);
+    background: rgba(14, 18, 28, 0.75);
+    backdrop-filter: blur(10px);
+  }
+  .group { display: flex; align-items: center; gap: 6px; padding: 0 10px 0 0; }
+  .group label { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+  select, input[type="text"] {
+    background: #10141f; color: var(--text);
+    border: 1px solid var(--panel-border); border-radius: 6px;
+    padding: 4px 8px; font-size: 12px; font-family: var(--font);
+    outline: none;
+  }
+  select:focus, input[type="text"]:focus { border-color: var(--accent); }
+  input[type="range"] { width: 90px; accent-color: var(--accent); }
+  button {
+    background: #151b29; color: var(--text);
+    border: 1px solid var(--panel-border); border-radius: 7px;
+    padding: 5px 12px; font-size: 12px; font-family: var(--font);
+    cursor: pointer; transition: background .15s, border-color .15s;
+  }
+  button:hover { background: #1d2434; border-color: rgba(120,140,180,.35); }
+  button.primary { background: rgba(63,214,255,0.16); border-color: rgba(63,214,255,0.5); color: var(--accent); font-weight: 600; }
+  button.primary:hover { background: rgba(63,214,255,0.26); }
+  button:disabled { opacity: .45; cursor: default; }
+  .val { font-family: var(--mono); font-size: 11px; color: var(--accent); min-width: 46px; }
+  #stage { grid-area: stage; position: relative; overflow: hidden; }
+  #stage canvas { display: block; }
+  #stage .hint {
+    position: absolute; left: 12px; bottom: 10px;
+    color: var(--text-dim); font-size: 11px; pointer-events: none;
+    background: rgba(10,13,20,.55); padding: 4px 8px; border-radius: 6px;
+  }
+  .legend {
+    position: absolute; top: 10px; left: 12px;
+    display: flex; flex-direction: column; gap: 4px;
+    background: rgba(10,13,20,.55); padding: 8px 10px; border-radius: 8px;
+    font-size: 11px; color: var(--text-dim); pointer-events: none;
+  }
+  .legend .row { display: flex; align-items: center; gap: 7px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .chip { width: 22px; height: 3px; border-radius: 2px; display: inline-block; }
+  #sidebar {
+    grid-area: sidebar;
+    overflow-y: auto;
+    border-left: 1px solid var(--panel-border);
+    background: var(--panel);
+    backdrop-filter: blur(14px);
+    padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .card {
+    background: rgba(13, 17, 27, 0.7);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 8px 10px;
+  }
+  .card h3 {
+    margin: 0 0 6px; font-size: 11px; font-weight: 700;
+    color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card h3 span.live { color: var(--accent); text-transform: none; letter-spacing: 0; font-weight: 600; }
+  .big-metric { display: flex; gap: 14px; }
+  .big-metric .m { flex: 1; text-align: center; }
+  .big-metric .m .k { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; }
+  .big-metric .m .v { font-size: 22px; font-family: var(--mono); font-weight: 600; }
+  canvas.chart { width: 100%; display: block; border-radius: 6px; background: rgba(9,12,19,0.6); }
+  #statusbar {
+    grid-area: status;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 12px; font-size: 11px; font-family: var(--mono); color: var(--text-dim);
+    border-top: 1px solid var(--panel-border); background: rgba(12,15,23,.9);
+    white-space: nowrap; overflow: hidden;
+  }
+  #statusbar b { color: var(--text); font-weight: 600; }
+  #error-banner {
+    display: none; margin: 2px 0 4px; padding: 8px 12px; border-radius: 8px;
+    background: rgba(248,113,113,.12); border: 1px solid rgba(248,113,113,.4);
+    color: #fca5a5; font-size: 12px;
+  }
+  button:focus-visible, select:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  #phaseChip {
+    font-size: 11px; font-weight: 600; font-family: var(--font);
+    padding: 3px 10px; border-radius: 999px; letter-spacing: 0.03em;
+    background: rgba(63,214,255,0.10); border: 1px solid rgba(63,214,255,0.35);
+    color: var(--text-dim); min-width: 86px; text-align: center;
+  }
+  #helpOverlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(6, 8, 12, 0.72);
+    display: none; align-items: center; justify-content: center;
+  }
+  #helpOverlay.open { display: flex; }
+  #helpOverlay .panel {
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 14px; padding: 22px 26px; max-width: 480px; width: min(480px, 90vw);
+    backdrop-filter: blur(18px); box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+  }
+  #helpOverlay h2 { margin: 0 0 10px; font-size: 16px; }
+  #helpOverlay ul { margin: 0 0 14px; padding-left: 18px; color: var(--text); font-size: 12.5px; line-height: 1.55; }
+  #helpOverlay .keys { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px; }
+  #helpOverlay .keys td { padding: 3px 8px; color: var(--text-dim); border-bottom: 1px solid rgba(120,140,180,0.12); }
+  #helpOverlay .keys td:first-child { font-family: var(--mono); color: var(--accent); white-space: nowrap; }
+  #btnLogScale { padding: 1px 8px; font-size: 10px; border-radius: 5px; }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(120,140,180,.25); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Forge · Neural Lab</h1>
+    <div class="sub">web export of the Forge app · MLclass §6 companion</div>
+    <div class="spacer"></div>
+    <button id="btnPlay" class="primary">▶ Train</button>
+    <button id="btnStep">Step</button>
+    <button id="btnResetWeights">Reset weights</button>
+    <span id="phaseChip">idle</span>
+  </header>
+
+  <div id="toolbar">
+    <div class="group">
+      <label>Dataset</label>
+      <select id="dataset">
+        <option value="spiral" selected>Spiral</option>
+        <option value="moons">Two moons</option>
+        <option value="circles">Concentric circles</option>
+        <option value="xor">XOR blobs</option>
+        <option value="gauss">Gaussians</option>
+      </select>
+    </div>
+    <div class="group"><label>Noise</label><input type="range" id="noise" min="0" max="50" value="15"><span class="val" id="noiseVal">0.15</span></div>
+    <div class="group"><button id="btnRegen">↻ Regenerate data</button></div>
+    <div class="group"><label>Hidden layers</label><input type="text" id="arch" value="8, 8" size="6"><span id="archErr" style="color:#fca5a5;font-size:10px;max-width:150px"></span></div>
+    <div class="group">
+      <label>Input features</label>
+      <select id="features">
+        <option value="extended" selected>x, y, x², y², x·y, sin</option>
+        <option value="basic">x, y (raw)</option>
+      </select>
+    </div>
+    <div class="group">
+      <label>Activation</label>
+      <select id="activation">
+        <option value="tanh" selected>tanh</option>
+        <option value="relu">ReLU</option>
+      </select>
+    </div>
+    <div class="group">
+      <label>Optimizer</label>
+      <select id="optimizer">
+        <option value="adam" selected>Adam</option>
+        <option value="sgd">SGD</option>
+      </select>
+    </div>
+    <div class="group">
+      <label>Learning rate</label>
+      <select id="lr">
+        <option>0.001</option><option>0.003</option><option value="0.01" selected>0.01</option>
+        <option>0.03</option><option>0.1</option><option>0.3</option><option>1</option>
+      </select>
+    </div>
+    <div class="group">
+      <label>Batch</label>
+      <select id="batch">
+        <option>1</option><option>4</option><option value="8" selected>8</option>
+        <option>16</option><option>32</option>
+      </select>
+    </div>
+    <div class="group"><label>Train speed</label><input type="range" id="trainSpeed" min="1" max="40" value="6"><span class="val" id="trainSpeedVal">6×</span></div>
+    <div class="group"><label>Wave speed</label><input type="range" id="waveSpeed" min="0.25" max="3" step="0.25" value="1"><span class="val" id="waveSpeedVal">1×</span></div>
+    <div class="group">
+      <label>Show</label>
+      <button id="btnSurface" class="primary">Decision surface</button>
+      <button id="btnAutoRotate">Auto-rotate</button>
+    </div>
+  </div>
+
+  <div id="stage">
+    <div class="legend">
+      <div class="row"><span class="dot" style="background:#3fd6ff"></span> forward pass — data flow</div>
+      <div class="row"><span class="dot" style="background:#ff7a3c"></span> backward pass — error & gradients</div>
+      <div class="row"><span class="chip" style="background:#4b8bff"></span> positive weight</div>
+      <div class="row"><span class="chip" style="background:#ff4b5c"></span> negative weight</div>
+      <div class="row"><span class="dot" style="background:#ffd166"></span> brightness = activation</div>
+    </div>
+    <div class="hint">drag: orbit · scroll: zoom · right-drag: pan · space: train/pause</div>
+  </div>
+
+  <div id="sidebar">
+    <div id="error-banner"></div>
+    <div class="card">
+      <h3>Live metrics <span class="live" id="epochLabel">epoch 0</span></h3>
+      <div class="big-metric">
+        <div class="m"><div class="k">Train loss</div><div class="v" id="mTrainLoss">–</div></div>
+        <div class="m"><div class="k">Test loss</div><div class="v" id="mTestLoss">–</div></div>
+        <div class="m"><div class="k">Test accuracy</div><div class="v" id="mAcc" style="color:var(--good)">–</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Loss curves <span class="live" style="display:flex;gap:8px;align-items:center"><button id="btnLogScale" title="Toggle log-scale loss axis">log</button>train / test</span></h3>
+      <canvas class="chart" id="lossChart" height="120" role="img" aria-label="Loss chart: not started"></canvas>
+    </div>
+    <div class="card">
+      <h3>Decision boundary <span class="live">test points</span></h3>
+      <canvas class="chart" id="boundaryMap" height="200" role="img" aria-label="Decision boundary map: not started"></canvas>
+    </div>
+    <div class="card">
+      <h3>Gradient flow <span class="live">‖∂L/∂W‖ per layer</span></h3>
+      <canvas class="chart" id="gradChart" height="110" role="img" aria-label="Gradient norms per layer: not started"></canvas>
+    </div>
+    <div class="card">
+      <h3>Weight distribution <span class="live">all layers</span></h3>
+      <canvas class="chart" id="histChart" height="90" role="img" aria-label="Weight distribution across all layers"></canvas>
+    </div>
+    <div class="card">
+      <h3>Confusion matrix <span class="live">test set</span></h3>
+      <canvas class="chart" id="confusion" height="120" role="img" aria-label="Confusion matrix on the test set"></canvas>
+    </div>
+    <div class="card">
+      <h3>Current sample activations</h3>
+      <canvas class="chart" id="actStrip" height="86" role="img" aria-label="Neuron activations for the current sample"></canvas>
+    </div>
+  </div>
+
+  <div id="statusbar">
+    <span>step <b id="sStep">0</b></span>
+    <span>epoch <b id="sEpoch">0</b></span>
+    <span>params <b id="sParams">–</b></span>
+    <span>lr <b id="sLr">–</b></span>
+    <span>dataset <b id="sData">–</b></span>
+    <span>fps <b id="sFps">–</b></span>
+  </div>
+</div>
+
+<div id="helpOverlay" role="dialog" aria-label="Help and keyboard shortcuts" aria-modal="true">
+  <div class="panel">
+    <h2>What am I looking at?</h2>
+    <ul>
+      <li><strong style="color:var(--accent)">Cyan waves</strong> are the <strong>forward pass</strong> — data flowing in → out for a real training sample.</li>
+      <li><strong style="color:var(--accent2)">Orange waves</strong> are the <strong>backward pass</strong> — the error and gradients flowing out → in.</li>
+      <li><strong>Edge color</strong> encodes the weight: blue = positive, red = negative; brightness = magnitude.</li>
+      <li>The charts update live as training runs. Press <strong>Space</strong> to start or pause training.</li>
+    </ul>
+    <table class="keys">
+      <tr><td>Space</td><td>start / pause training</td></tr>
+      <tr><td>S</td><td>single training step</td></tr>
+      <tr><td>R</td><td>regenerate dataset</td></tr>
+      <tr><td>1 – 5</td><td>switch dataset</td></tr>
+      <tr><td>F</td><td>toggle fullscreen</td></tr>
+      <tr><td>?</td><td>toggle this help</td></tr>
+      <tr><td>Esc</td><td>close this help</td></tr>
+    </table>
+    <button id="btnHelpClose" class="primary">Close</button>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============================================================================
+// /*ENGINE-START*/  (RNG, datasets, MLP — pure, DOM-free; unit-tested in Node)
+// ============================================================================
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function makeDataset(name, n, noise, seed) {
+  const rand = mulberry32(seed);
+  const gauss = () => {
+    const u = Math.max(rand(), 1e-12), v = rand();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  const pts = [];
+  const add = (x, y, label) => pts.push({ x, y, label });
+  n = Math.max(20, Math.floor(n / 2) * 2);
+
+  if (name === 'spiral') {
+    for (let i = 0; i < n; i++) {
+      const cls = i % 2;
+      // Inner radius 0.25 keeps the two arms separable even with noise —
+      // at smaller radii the arms interleave and the labels become genuinely
+      // ambiguous (measured: a 24×24 net overfits to 100% train while test
+      // caps at ~85%, i.e. pure label noise, not an optimization failure).
+      const r = (i / n) * 0.75 + 0.25;
+      const t = 1.75 * (i / n) * 2 * Math.PI + cls * Math.PI;
+      add(r * Math.sin(t) + gauss() * noise * 0.3,
+          r * Math.cos(t) + gauss() * noise * 0.3, cls);
+    }
+  } else if (name === 'moons') {
+    for (let i = 0; i < n; i++) {
+      const cls = i % 2;
+      const t = rand() * Math.PI;
+      let x, y;
+      if (cls === 0) { x = Math.cos(t); y = Math.sin(t); }
+      else { x = 1 - Math.cos(t); y = 0.5 - Math.sin(t); }
+      add((x - 0.5) + gauss() * noise * 0.6,
+          (y - 0.25) * 1.6 + gauss() * noise * 0.6, cls);
+    }
+  } else if (name === 'circles') {
+    for (let i = 0; i < n; i++) {
+      const cls = i % 2;
+      const r = cls === 0 ? rand() * 0.35 : 0.65 + rand() * 0.3;
+      const t = rand() * 2 * Math.PI;
+      add(r * Math.sin(t) + gauss() * noise * 0.4,
+          r * Math.cos(t) + gauss() * noise * 0.4, cls);
+    }
+  } else if (name === 'xor') {
+    // Enforce exact class balance: sample a point, then mirror it into the
+    // quadrant matching its class slot when needed (mirroring preserves the
+    // XOR label structure).
+    for (let i = 0; i < n; i++) {
+      const cls = i % 2;
+      let x = (rand() * 1.8 - 0.9), y = (rand() * 1.8 - 0.9);
+      x += x > 0 ? 0.1 : -0.1; y += y > 0 ? 0.1 : -0.1;
+      const label = (x > 0) !== (y > 0) ? 1 : 0;
+      if (label !== cls) x = -x;
+      add(x + gauss() * noise * 0.3, y + gauss() * noise * 0.3, cls);
+    }
+  } else { // gauss
+    for (let i = 0; i < n; i++) {
+      const cls = i % 2;
+      const cx = cls === 0 ? -0.5 : 0.5, cy = cls === 0 ? -0.4 : 0.4;
+      add(cx + gauss() * (0.22 + noise * 0.6),
+          cy + gauss() * (0.22 + noise * 0.6), cls);
+    }
+  }
+  return pts;
+}
+
+function splitTrainTest(pts, testFraction, seed) {
+  const rand = mulberry32(seed);
+  const shuffled = [...pts];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const nTest = Math.floor(shuffled.length * testFraction);
+  return { train: shuffled.slice(0, shuffled.length - nTest),
+           test: shuffled.slice(shuffled.length - nTest) };
+}
+
+class MLP {
+  constructor(layerSizes, opts = {}) {
+    this.activation = opts.activation || 'tanh';
+    this.optimizer = opts.optimizer || 'adam';
+    this.lr = opts.lr ?? 0.01;
+    this.seed = opts.seed ?? 42;
+    this.features = opts.features || 'basic'; // 'basic' = (x, y)
+    this.build(layerSizes);
+  }
+
+  // Input feature mapping: 'basic' feeds raw coordinates; 'extended' adds the
+  // polynomial/trigonometric features TensorFlow Playground made famous —
+  // letting students *see* how feature engineering collapses a hard problem
+  // (spiral) into an easy one.
+  featurize(x, y) {
+    if (this.features === 'extended') {
+      return [x, y, x * x, y * y, x * y, Math.sin(x), Math.sin(y)];
+    }
+    return [x, y];
+  }
+
+  featureNames() {
+    return this.features === 'extended'
+      ? ['x', 'y', 'x²', 'y²', 'x·y', 'sin x', 'sin y']
+      : ['x', 'y'];
+  }
+
+  build(layerSizes) {
+    this.sizes = layerSizes.slice();
+    this.L = layerSizes.length - 1;
+    this.W = []; this.b = [];
+    this.dW = []; this.db = [];
+    const rand = mulberry32(this.seed);
+    for (let l = 0; l < this.L; l++) {
+      const nIn = this.sizes[l], nOut = this.sizes[l + 1];
+      const scale = Math.sqrt(2 / (nIn + nOut)) * 1.6;
+      const w = new Float64Array(nIn * nOut);
+      for (let i = 0; i < w.length; i++) w[i] = (rand() * 2 - 1) * scale;
+      this.W.push(w);
+      this.b.push(new Float64Array(nOut));
+      this.dW.push(new Float64Array(nIn * nOut));
+      this.db.push(new Float64Array(nOut));
+    }
+    // Adam state (per-parameter first/second moment estimates + step count).
+    this.mW = this.W.map(w => new Float64Array(w.length));
+    this.vW = this.W.map(w => new Float64Array(w.length));
+    this.mb = this.b.map(x => new Float64Array(x.length));
+    this.vb = this.b.map(x => new Float64Array(x.length));
+    this.adamT = 0;
+    this.lastActs = this.sizes.map(n => new Float64Array(n));
+  }
+
+  get paramCount() {
+    let c = 0;
+    for (let l = 0; l < this.L; l++) c += this.W[l].length + this.b[l].length;
+    return c;
+  }
+
+  _act(z) { return this.activation === 'relu' ? (z > 0 ? z : 0) : Math.tanh(z); }
+  _actD(z, a) {
+    if (this.activation === 'relu') return z > 0 ? 1 : 0;
+    return 1 - a * a;
+  }
+
+  forward(sample) {
+    const a = this.lastActs;
+    const f = this.featurize(sample.x, sample.y);
+    for (let i = 0; i < a[0].length && i < f.length; i++) a[0][i] = f[i];
+    for (let l = 0; l < this.L; l++) {
+      const nIn = this.sizes[l], nOut = this.sizes[l + 1];
+      const W = this.W[l], b = this.b[l], src = a[l], dst = a[l + 1];
+      for (let j = 0; j < nOut; j++) {
+        let z = b[j];
+        for (let i = 0; i < nIn; i++) z += src[i] * W[i * nOut + j];
+        dst[j] = (l === this.L - 1) ? 1 / (1 + Math.exp(-z)) : this._act(z);
+      }
+    }
+    return a[this.L][0];
+  }
+
+  predict(x, y) { return this.forward({ x, y }); }
+
+  lossAndAcc(pts) {
+    let loss = 0, correct = 0;
+    for (const p of pts) {
+      const q = Math.min(1 - 1e-9, Math.max(1e-9, this.forward(p)));
+      const t = p.label;
+      loss += -(t * Math.log(q) + (1 - t) * Math.log(1 - q));
+      if ((q >= 0.5 ? 1 : 0) === t) correct++;
+    }
+    return { loss: pts.length ? loss / pts.length : 0,
+             acc: pts.length ? correct / pts.length : 0 };
+  }
+
+  trainStep(batch, probeSample) {
+    const { W, b, dW, db, sizes, L } = this;
+    for (let l = 0; l < L; l++) { dW[l].fill(0); db[l].fill(0); }
+
+    let loss = 0;
+    for (const s of batch) {
+      const acts = [new Float64Array(this.featurize(s.x, s.y))];
+      const zs = [null];
+      for (let l = 0; l < L; l++) {
+        const nIn = sizes[l], nOut = sizes[l + 1];
+        const src = acts[l], z = new Float64Array(nOut), aOut = new Float64Array(nOut);
+        for (let j = 0; j < nOut; j++) {
+          let v = b[l][j];
+          for (let i = 0; i < nIn; i++) v += src[i] * W[l][i * nOut + j];
+          z[j] = v;
+          aOut[j] = (l === L - 1) ? 1 / (1 + Math.exp(-v)) : this._act(v);
+        }
+        zs.push(z); acts.push(aOut);
+      }
+      const p = acts[L][0], t = s.label;
+      const q = Math.min(1 - 1e-9, Math.max(1e-9, p));
+      loss += -(t * Math.log(q) + (1 - t) * Math.log(1 - q));
+
+      let delta = new Float64Array([p - t]);
+      for (let l = L - 1; l >= 0; l--) {
+        const nIn = sizes[l], nOut = sizes[l + 1];
+        const src = acts[l];
+        for (let j = 0; j < nOut; j++) {
+          db[l][j] += delta[j];
+          for (let i = 0; i < nIn; i++) dW[l][i * nOut + j] += src[i] * delta[j];
+        }
+        if (l > 0) {
+          const prev = new Float64Array(nIn);
+          for (let i = 0; i < nIn; i++) {
+            let v = 0;
+            for (let j = 0; j < nOut; j++) v += W[l][i * nOut + j] * delta[j];
+            prev[i] = v * this._actD(zs[l][i], acts[l][i]);
+          }
+          delta = prev;
+        }
+      }
+    }
+
+    const m = batch.length;
+    const gradNorms = new Array(L).fill(0);
+    for (let l = 0; l < L; l++) {
+      let sq = 0;
+      for (let k = 0; k < W[l].length; k++) sq += (dW[l][k] / m) ** 2;
+      gradNorms[l] = Math.sqrt(sq) / m;
+    }
+
+    // ---- parameter update: Adam (default) or plain SGD ----
+    if (this.optimizer === 'adam') {
+      const b1 = 0.9, b2 = 0.999, eps = 1e-8;
+      this.adamT++;
+      const bc1 = 1 - Math.pow(b1, this.adamT);
+      const bc2 = 1 - Math.pow(b2, this.adamT);
+      for (let l = 0; l < L; l++) {
+        for (let k = 0; k < W[l].length; k++) {
+          const g = dW[l][k] / m;
+          this.mW[l][k] = b1 * this.mW[l][k] + (1 - b1) * g;
+          this.vW[l][k] = b2 * this.vW[l][k] + (1 - b2) * g * g;
+          W[l][k] -= this.lr * (this.mW[l][k] / bc1) / (Math.sqrt(this.vW[l][k] / bc2) + eps);
+        }
+        for (let k = 0; k < b[l].length; k++) {
+          const g = db[l][k] / m;
+          this.mb[l][k] = b1 * this.mb[l][k] + (1 - b1) * g;
+          this.vb[l][k] = b2 * this.vb[l][k] + (1 - b2) * g * g;
+          b[l][k] -= this.lr * (this.mb[l][k] / bc1) / (Math.sqrt(this.vb[l][k] / bc2) + eps);
+        }
+      }
+    } else {
+      for (let l = 0; l < L; l++) {
+        for (let k = 0; k < W[l].length; k++) W[l][k] -= this.lr * dW[l][k] / m;
+        for (let k = 0; k < b[l].length; k++) b[l][k] -= this.lr * db[l][k] / m;
+      }
+    }
+
+    if (probeSample) this.forward(probeSample);
+    return { loss: loss / m, gradNorms };
+  }
+}
+
+// ============================================================================
+// /*ENGINE-END*/  — end of pure engine (unit-tested in Node; see README)
+// ============================================================================
+
+// ============================================================================
+// Application state
+// ============================================================================
+const state = {
+  playing: false,
+  datasetName: 'spiral',
+  noise: 0.15,
+  dataSeed: 7,
+  arch: [8, 8],
+  activation: 'tanh',
+  optimizer: 'adam',
+  features: 'extended',
+  lr: 0.01,
+  batch: 8,
+  trainSpeed: 6,
+  waveSpeed: 1,
+  showSurface: true,
+  autoRotate: false,
+  step: 0,
+  epoch: 0,
+  points: { train: [], test: [] },
+  net: null,
+  probeIdx: 0,
+  history: [],
+  lastGradNorms: [],
+  lastGradEdge: [],        // per-layer per-edge |gradient| snapshot (backward wave)
+  gradAbsMax: 1e-12,
+  confusion: [0, 0, 0, 0], // TP, FP, FN, TN
+  fps: 0,
+};
+
+function rebuildData() {
+  const pts = makeDataset(state.datasetName, 400, state.noise, state.dataSeed);
+  state.points = splitTrainTest(pts, 0.25, state.dataSeed + 1);
+  state.probeIdx = 0;
+}
+
+function rebuildNetwork() {
+  const featureCount = state.features === 'extended' ? 7 : 2;
+  const sizes = [featureCount, ...state.arch, 1];
+  state.net = new MLP(sizes, {
+    activation: state.activation,
+    optimizer: state.optimizer,
+    features: state.features,
+    lr: state.lr,
+    seed: 42,
+  });
+  state.history = [];
+  state.step = 0; state.epoch = 0;
+  state.lastGradNorms = [];
+  state.confusion = [0, 0, 0, 0];
+  state.probeIdx = 0;
+  buildSceneNetwork();
+  refreshAnalytics();
+  updateStatus();
+}
+
+// ============================================================================
+// Three.js scene
+// ============================================================================
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+stage.appendChild(renderer.domElement);
+renderer.domElement.setAttribute('role', 'img');
+renderer.domElement.setAttribute('aria-label',
+  'Interactive 3D view of the neural network; drag to orbit, scroll to zoom');
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0b0e14, 0.028);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+camera.position.set(10, 7, 16);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.autoRotateSpeed = 1.1;
+
+// Reduced-motion support: fewer pulses, no auto-rotate, no scale pulse.
+const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+const reduceMotion = { matches: reduceMotionQuery.matches };
+reduceMotionQuery.addEventListener?.('change', (ev) => {
+  reduceMotion.matches = ev.matches;
+  document.getElementById('btnAutoRotate').disabled = ev.matches;
+  if (ev.matches) {
+    state.autoRotate = false;
+    controls.autoRotate = false;
+    document.getElementById('btnAutoRotate').classList.remove('primary');
+  }
+});
+if (reduceMotion.matches) document.getElementById('btnAutoRotate').disabled = true;
+
+scene.add(new THREE.AmbientLight(0x8899bb, 0.7));
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
+keyLight.position.set(6, 10, 8);
+scene.add(keyLight);
+const rimLight = new THREE.DirectionalLight(0x3fd6ff, 0.5);
+rimLight.position.set(-8, -4, -10);
+scene.add(rimLight);
+
+const LAYER_GAP = 4.2;
+const NEURON_GAP = 1.35;
+
+let neuronMeshes = [];
+let edgeLines = null;
+let edgeIndex = [];
+let layerLabels = [];
+let surfaceMesh = null;
+
+function layerColor(l, L) {
+  if (l === 0) return 0xffd166;
+  if (l === L) return 0xff5ca8;
+  return 0x5ac8fa;
+}
+
+function makeLabelSprite(text) {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.font = '600 26px -apple-system, "SF Pro Text", Arial';
+  ctx.fillStyle = 'rgba(180,195,225,0.9)';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 32);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const s = new THREE.Sprite(mat);
+  s.scale.set(3.4, 0.85, 1);
+  return s;
+}
+
+function buildSceneNetwork() {
+  for (const arr of neuronMeshes) for (const m of arr) { scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
+  for (const s of layerLabels) { scene.remove(s); s.material.map.dispose(); s.material.dispose(); }
+  if (edgeLines) { scene.remove(edgeLines); edgeLines.geometry.dispose(); edgeLines.material.dispose(); }
+  neuronMeshes = []; layerLabels = []; edgeIndex = [];
+
+  const sizes = state.net.sizes;
+  const L = state.net.L;
+  const xOff = (L * LAYER_GAP) / 2;
+
+  for (let l = 0; l <= L; l++) {
+    const n = sizes[l];
+    const z = l * LAYER_GAP - xOff;
+    const ySpan = (n - 1) * NEURON_GAP;
+    const row = [];
+    const geo = new THREE.SphereGeometry(0.34, 20, 20);
+    for (let i = 0; i < n; i++) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: layerColor(l, L),
+        emissive: layerColor(l, L),
+        emissiveIntensity: 0.25,
+        roughness: 0.35, metalness: 0.25,
+      });
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(0, ySpan / 2 - i * NEURON_GAP, z);
+      scene.add(m);
+      row.push(m);
+    }
+    neuronMeshes.push(row);
+
+    const label = makeLabelSprite(
+      l === 0 ? (L > 1 && sizes[0] > 2 ? `INPUT · ${sizes[0]} engineered features` : 'INPUT (x, y)')
+      : l === L ? 'OUTPUT ŷ'
+      : `HIDDEN ${l}`);
+    label.position.set(0, ySpan / 2 + 1.35, z);
+    scene.add(label);
+    layerLabels.push(label);
+  }
+
+  const positions = []; const colors = [];
+  for (let l = 0; l < L; l++) {
+    const list = [];
+    for (let i = 0; i < sizes[l]; i++) {
+      for (let j = 0; j < sizes[l + 1]; j++) {
+        const a = neuronMeshes[l][i].position, b = neuronMeshes[l + 1][j].position;
+        const k0 = positions.length / 3;
+        positions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+        colors.push(0.3, 0.55, 1, 0.3, 0.55, 1);
+        list.push({ l, i, j, k0 });
+      }
+    }
+    edgeIndex.push(list);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  edgeLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 }));
+  scene.add(edgeLines);
+  wScaleCache = { val: 0.5, at: -1e9 };
+  updateEdgeColors();
+
+  buildDecisionSurface();
+  controls.target.set(0, 0, 0);
+}
+
+let wScaleCache = { val: 0.5, at: -1e9 };
+function weightScaleMax() {
+  if (state.step - wScaleCache.at > 20) {
+    let mx = 1e-6;
+    for (let l = 0; l < state.net.L; l++) for (const w of state.net.W[l]) mx = Math.max(mx, Math.abs(w));
+    wScaleCache = { val: mx, at: state.step };
+  }
+  return Math.max(0.4, wScaleCache.val);
+}
+
+function updateEdgeColors() {
+  const colAttr = edgeLines.geometry.getAttribute('color');
+  const maxW = weightScaleMax();
+  for (let l = 0; l < state.net.L; l++) {
+    const nOut = state.net.sizes[l + 1];
+    for (const e of edgeIndex[l]) {
+      const w = state.net.W[l][e.i * nOut + e.j];
+      const t = Math.min(1, Math.abs(w) / maxW);
+      const r = w >= 0 ? 0.22 + 0.06 * t : 0.55 + 0.4 * t;
+      const g = w >= 0 ? 0.45 + 0.12 * t : 0.12 + 0.08 * t;
+      const b = w >= 0 ? 1.0 : 0.22;
+      const k = e.k0 * 3;
+      colAttr.array[k] = r; colAttr.array[k + 1] = g; colAttr.array[k + 2] = b;
+      colAttr.array[k + 3] = r; colAttr.array[k + 4] = g; colAttr.array[k + 5] = b;
+    }
+  }
+  colAttr.needsUpdate = true;
+}
+
+// Same as updateEdgeColors, but colors encode the REAL per-edge gradient
+// magnitude from the most recent train step (used while the backward wave
+// flows): deep red base → bright orange-white for the largest |∂L/∂w|.
+function updateEdgeColorsGrad() {
+  if (!state.lastGradEdge.length) return;
+  const colAttr = edgeLines.geometry.getAttribute('color');
+  const gMax = state.gradAbsMax || 1e-12;
+  for (let l = 0; l < state.net.L; l++) {
+    const arr = state.lastGradEdge[l];
+    if (!arr) continue;
+    for (let k = 0; k < edgeIndex[l].length; k++) {
+      const t = Math.min(1, arr[k] / gMax);
+      const r = 0.30 + 0.60 * t, g = 0.14 + 0.06 * t, b = 0.10 + 0.04 * t;
+      const k0 = edgeIndex[l][k].k0 * 3;
+      colAttr.array[k0] = r; colAttr.array[k0 + 1] = g; colAttr.array[k0 + 2] = b;
+      colAttr.array[k0 + 3] = r; colAttr.array[k0 + 4] = g; colAttr.array[k0 + 5] = b;
+    }
+  }
+  colAttr.needsUpdate = true;
+}
+
+let surfaceTex = null;
+const SURF_N = 64;
+function buildDecisionSurface() {
+  if (surfaceMesh) { scene.remove(surfaceMesh); surfaceMesh.geometry.dispose(); surfaceMesh.material.dispose(); if (surfaceTex) surfaceTex.dispose(); surfaceMesh = null; }
+  surfaceTex = new THREE.DataTexture(new Uint8Array(SURF_N * SURF_N * 4), SURF_N, SURF_N);
+  surfaceTex.minFilter = surfaceTex.magFilter = THREE.LinearFilter;
+  const g = new THREE.PlaneGeometry(5.6, 5.6);
+  const m = new THREE.MeshBasicMaterial({ map: surfaceTex, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+  surfaceMesh = new THREE.Mesh(g, m);
+  surfaceMesh.rotation.x = -Math.PI / 2;
+  surfaceMesh.position.set(0, -5.4, 0);
+  surfaceMesh.visible = state.showSurface;
+  scene.add(surfaceMesh);
+  updateDecisionSurface();
+}
+
+function updateDecisionSurface() {
+  if (!surfaceMesh || !surfaceMesh.visible) return;
+  const data = surfaceTex.image.data;
+  for (let row = 0; row < SURF_N; row++) {
+    const y = 1 - (row / (SURF_N - 1)) * 2;
+    for (let col = 0; col < SURF_N; col++) {
+      const x = (col / (SURF_N - 1)) * 2 - 1;
+      const p = state.net.predict(x, y);
+      const k = (row * SURF_N + col) * 4;
+      if (p >= 0.5) { data[k] = 40 + 150 * (p - 0.5) * 2; data[k + 1] = 90; data[k + 2] = 160 + 90 * (p - 0.5) * 2; }
+      else { data[k] = 170 + 80 * (0.5 - p) * 2; data[k + 1] = 60; data[k + 2] = 90; }
+      data[k + 3] = 150;
+    }
+  }
+  surfaceTex.needsUpdate = true;
+}
+
+// ============================================================================
+// Pulse waves — the visible "flow of data" through the network.
+// Forward wave: cyan particles layer-by-layer (the current sample's signal).
+// Backward wave: orange particles in reverse (the error/gradient flow).
+// ============================================================================
+const PULSE_POOL_SIZE = 1400;
+const pulseGeo = new THREE.SphereGeometry(0.09, 8, 8);
+const pulseMatFwd = new THREE.MeshBasicMaterial({ color: 0x3fd6ff, transparent: true, opacity: 0.95 });
+const pulseMatBwd = new THREE.MeshBasicMaterial({ color: 0xff7a3c, transparent: true, opacity: 0.95 });
+const pulsePool = [];
+for (let i = 0; i < PULSE_POOL_SIZE; i++) {
+  const m = new THREE.Mesh(pulseGeo, pulseMatFwd);
+  m.visible = false;
+  scene.add(m);
+  pulsePool.push({ mesh: m, active: false, t: 0, dur: 1, from: null, to: null, dir: 1 });
+}
+let pulseCursor = 0;
+function acquirePulse() {
+  for (let i = 0; i < PULSE_POOL_SIZE; i++) {
+    const p = pulsePool[(pulseCursor + i) % PULSE_POOL_SIZE];
+    if (!p.active) { pulseCursor = (pulseCursor + i + 1) % PULSE_POOL_SIZE; return p; }
+  }
+  return null;
+}
+
+const WAVE_BASE_DUR = 0.55;
+const MAX_WAVES_INFLIGHT = 4;
+let wavesInFlight = 0;
+
+function launchWave(dir, delayOffsetMs = 0) {
+  if (wavesInFlight >= MAX_WAVES_INFLIGHT) return false;
+  wavesInFlight++;
+  const net = state.net;
+  const sizes = net.sizes;
+  const L = net.L;
+  const dur = WAVE_BASE_DUR / Math.max(0.05, state.waveSpeed);
+  const gMax = state.gradAbsMax || 1e-12;
+  for (let l = 0; l < L; l++) {
+    const edges = edgeIndex[l];
+    let budget = Math.min(edges.length, Math.max(24, Math.floor(380 / L)));
+    if (reduceMotion.matches) budget = Math.max(6, Math.floor(budget * 0.2));
+    // Forward waves rank edges by |weight|; backward waves rank by the REAL
+    // per-edge |gradient| — the biggest-blame connections fire the pulses.
+    const useGrad = dir === -1 && state.lastGradEdge.length && state.lastGradEdge[l];
+    const scored = edges.map((e, k) => {
+      const s = useGrad
+        ? state.lastGradEdge[l][k]
+        : Math.abs(net.W[l][e.i * sizes[l + 1] + e.j]);
+      return { e, s, t: useGrad ? Math.min(1, s / gMax) : 0 };
+    }).sort((a, b) => b.s - a.s);
+    const delay = delayOffsetMs + (l * dur * 1000);
+    const src = dir === 1 ? neuronMeshes[l] : neuronMeshes[l + 1];
+    const dst = dir === 1 ? neuronMeshes[l + 1] : neuronMeshes[l];
+    for (let k = 0; k < budget; k++) {
+      const { e, t } = scored[k];
+      const p = acquirePulse();
+      if (!p) break;
+      const from = dir === 1 ? src[e.i] : src[e.j];
+      const to = dir === 1 ? dst[e.j] : dst[e.i];
+      p.active = true; p.t = -delay; p.dur = dur * 1000;
+      p.from = from.position; p.to = to.position; p.dir = dir;
+      // Backward pulses grow with the edge's real gradient share.
+      p.mag = dir === -1 ? 0.6 + 1.4 * t : 1;
+      p.mesh.material = dir === 1 ? pulseMatFwd : pulseMatBwd;
+      p.mesh.visible = false;
+    }
+    setTimeout(() => flashLayer(dst, dir, dur), delay + dur * 400);
+  }
+  setTimeout(() => { wavesInFlight = Math.max(0, wavesInFlight - 1); },
+             delayOffsetMs + L * dur * 1000 + dur * 1000);
+  return true;
+}
+
+function flashLayer(row, dir, dur) {
+  const l = neuronMeshes.indexOf(row);
+  if (l < 0) return;
+  const acts = state.net.lastActs;
+  // For the backward wave, flash strength = this layer's share of the total
+  // gradient norm (the vanishing-gradient story, visible per layer).
+  let layerT = 0.4;
+  if (dir === -1 && state.lastGradNorms.length) {
+    const mx = Math.max(...state.lastGradNorms);
+    layerT = mx > 0 ? 0.25 + 0.75 * ((state.lastGradNorms[l] || 0) / mx) : 0.3;
+  }
+  for (let i = 0; i < row.length; i++) {
+    const a = acts[l] ? Math.abs(acts[l][i]) : 0;
+    row[i].userData.flash = {
+      until: performance.now() + dur * 700, dir,
+      mag: Math.min(1, a), layerT,
+    };
+  }
+}
+
+function updatePulses(dtMs) {
+  for (const p of pulsePool) {
+    if (!p.active) continue;
+    p.t += dtMs;
+    if (p.t < 0) { p.mesh.visible = false; continue; }
+    const f = p.t / p.dur;
+    if (f >= 1) { p.active = false; p.mesh.visible = false; continue; }
+    p.mesh.visible = true;
+    p.mesh.position.lerpVectors(p.from, p.to, f);
+    const pulse = reduceMotion.matches ? 1 : 1 + 0.35 * Math.sin(f * Math.PI);
+    p.mesh.scale.setScalar((p.mag || 1) * pulse);
+  }
+}
+
+function updateNeuronGlow() {
+  const now = performance.now();
+  const acts = state.net.lastActs;
+  for (let l = 0; l < neuronMeshes.length; l++) {
+    for (let i = 0; i < neuronMeshes[l].length; i++) {
+      const mesh = neuronMeshes[l][i];
+      const fl = mesh.userData.flash;
+      let intensity = 0.22;
+      if (fl) {
+        if (now > fl.until) {
+          mesh.userData.flash = null;
+        } else {
+          const base = acts[l] ? Math.min(1, Math.abs(acts[l][i])) : 0.2;
+          const floor = fl.dir === -1 ? (fl.layerT ?? 0.4) : 0;
+          intensity = 0.3 + 1.5 * Math.max(base, floor);
+          if (fl.dir === -1) mesh.material.emissive.setHex(0xff5533);
+        }
+      }
+      if (!fl || fl.dir !== -1) mesh.material.emissive.setHex(layerColor(l, state.net.L));
+      mesh.material.emissiveIntensity = intensity;
+    }
+  }
+}
+
+// ============================================================================
+// Analytics rendering (2D canvases)
+// ============================================================================
+function ctx2d(id) {
+  const c = document.getElementById(id);
+  const dpr = Math.min(window.devicePixelRatio, 2);
+  const w = c.clientWidth || 300;
+  const h = parseInt(c.getAttribute('height'));
+  if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+
+let lossLog = false;
+
+function drawLossChart() {
+  const { ctx, w, h } = ctx2d('lossChart');
+  const hist = state.history;
+  ctx.font = '10px monospace';
+  if (hist.length < 2) {
+    ctx.fillStyle = '#66708a'; ctx.fillText('start training to plot loss…', 10, h / 2);
+    return;
+  }
+  const maxLoss = Math.max(0.05, ...hist.map(d => Math.max(d.trainLoss, d.testLoss)));
+  const vMin = lossLog ? Math.log10(1e-4) : 0;
+  const vMax = lossLog ? Math.log10(maxLoss) : maxLoss;
+  const val = v => lossLog ? Math.log10(Math.max(1e-4, v)) : v;
+  const X = i => 8 + (i / (hist.length - 1)) * (w - 46);
+  const Y = v => h - 10 - ((val(v) - vMin) / (vMax - vMin)) * (h - 22);
+  // y-axis tick labels (right gutter) + grid lines.
+  const ticks = lossLog
+    ? [-4, -3, -2, -1, 0].map(e => ({ v: Math.pow(10, e), label: `1e${e}` }))
+        .filter(t => val(t.v) >= vMin && val(t.v) <= vMax)
+    : [0, maxLoss / 2, maxLoss].map(v => ({ v, label: v.toFixed(2) }));
+  ctx.strokeStyle = 'rgba(120,140,180,0.15)';
+  ctx.fillStyle = '#66708a';
+  for (const t of ticks) {
+    const y = Y(t.v);
+    ctx.beginPath(); ctx.moveTo(8, y); ctx.lineTo(w - 46, y); ctx.stroke();
+    ctx.fillText(t.label, w - 42, y + 3);
+  }
+  const line = (key, color) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath();
+    hist.forEach((d, i) => i ? ctx.lineTo(X(i), Y(d[key])) : ctx.moveTo(X(i), Y(d[key])));
+    ctx.stroke();
+  };
+  line('trainLoss', '#3fd6ff');
+  line('testLoss', '#ff7a3c');
+  const last = hist[hist.length - 1];
+  ctx.fillStyle = '#3fd6ff';
+  ctx.fillText(`train ${last.trainLoss.toFixed(3)}`, 8, 10);
+  ctx.fillStyle = '#ff7a3c';
+  ctx.fillText(`test ${last.testLoss.toFixed(3)}`, 78, 10);
+}
+
+function drawBoundaryMap() {
+  const { ctx, w, h } = ctx2d('boundaryMap');
+  const N = 56;
+  const cellW = w / N, cellH = h / N;
+  for (let row = 0; row < N; row++) {
+    const y = 1 - (row / (N - 1)) * 2;
+    for (let col = 0; col < N; col++) {
+      const x = (col / (N - 1)) * 2 - 1;
+      const p = state.net.predict(x, y);
+      if (p >= 0.5) ctx.fillStyle = `rgba(63,214,255,${0.10 + 0.38 * (p - 0.5) * 2})`;
+      else ctx.fillStyle = `rgba(255,122,60,${0.10 + 0.38 * (0.5 - p) * 2})`;
+      ctx.fillRect(col * cellW, row * cellH, cellW + 1, cellH + 1);
+    }
+  }
+  for (const p of state.points.test) {
+    const cx = (p.x + 1) / 2 * w, cy = (1 - (p.y + 1) / 2) * h;
+    ctx.beginPath(); ctx.arc(cx, cy, 2.6, 0, 7);
+    ctx.fillStyle = p.label === 1 ? '#ffffff' : '#131722';
+    ctx.fill();
+    ctx.strokeStyle = p.label === 1 ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1; ctx.stroke();
+  }
+}
+
+function drawGradChart() {
+  const { ctx, w, h } = ctx2d('gradChart');
+  const norms = state.lastGradNorms;
+  ctx.font = '10px monospace';
+  if (!norms.length) { ctx.fillStyle = '#66708a'; ctx.fillText('no gradients yet', 10, h / 2); return; }
+  const max = Math.max(1e-9, ...norms);
+  // Log-mapped bar length so tiny (vanishing) gradients stay visible.
+  const tOf = v => Math.log10(1 + v * 1e4) / Math.log10(1 + max * 1e4);
+  const bh = (h - 8) / norms.length;
+  norms.forEach((v, l) => {
+    const bw = tOf(v) * (w - 110);
+    ctx.fillStyle = 'rgba(63,214,255,0.22)';
+    ctx.fillRect(70, 4 + l * bh + 2, w - 80, bh - 6);
+    ctx.fillStyle = '#3fd6ff';
+    ctx.fillRect(70, 4 + l * bh + 2, Math.max(2, bw), bh - 6);
+    ctx.fillStyle = '#8b95ab';
+    ctx.fillText(`L${l}`, 42, 4 + l * bh + bh / 2 + 2);
+    ctx.fillText(v.toExponential(1), 74 + Math.max(2, bw) + 3, 4 + l * bh + bh / 2 + 2);
+  });
+}
+
+function drawHistChart() {
+  const { ctx, w, h } = ctx2d('histChart');
+  const BINS = 21, bin = new Array(BINS).fill(0);
+  let maxAbs = 1e-6;
+  for (let l = 0; l < state.net.L; l++) for (const v of state.net.W[l]) maxAbs = Math.max(maxAbs, Math.abs(v));
+  for (let l = 0; l < state.net.L; l++)
+    for (const v of state.net.W[l])
+      bin[Math.min(BINS - 1, Math.floor((v + maxAbs) / (2 * maxAbs) * BINS))]++;
+  const maxC = Math.max(...bin);
+  const bw = w / BINS;
+  for (let i = 0; i < BINS; i++) {
+    const bh = (bin[i] / maxC) * (h - 14);
+    const t = (i + 0.5) / BINS;
+    ctx.fillStyle = `rgb(${Math.round(120 + 135 * (1 - t))},120,${Math.round(120 + 135 * t)})`;
+    ctx.fillRect(i * bw + 1, h - 8 - bh, bw - 2, bh);
+  }
+  ctx.fillStyle = '#66708a'; ctx.font = '10px monospace';
+  ctx.fillText(`−${maxAbs.toFixed(2)}`, 2, h - 1);
+  ctx.fillText(`+${maxAbs.toFixed(2)}`, w - 38, h - 1);
+}
+
+function drawConfusion() {
+  const { ctx, w, h } = ctx2d('confusion');
+  const [tp, fp, fn, tn] = state.confusion;
+  const total = Math.max(1, tp + fp + fn + tn);
+  const x0 = 58, cw = (w - x0 - 22) / 2, chh = (h - 56) / 2;
+  const cells = [
+    { v: tn, label: 'TN', x: x0, y: 4, color: [52, 211, 153] },
+    { v: fp, label: 'FP', x: x0 + cw + 4, y: 4, color: [248, 113, 113] },
+    { v: fn, label: 'FN', x: x0, y: 4 + chh + 4, color: [248, 113, 113] },
+    { v: tp, label: 'TP', x: x0 + cw + 4, y: 4 + chh + 4, color: [52, 211, 153] },
+  ];
+  ctx.font = '10px monospace';
+  for (const c of cells) {
+    const a = c.v / total;
+    ctx.fillStyle = `rgba(${c.color[0]},${c.color[1]},${c.color[2]},${0.15 + 0.7 * a})`;
+    ctx.fillRect(c.x, c.y, cw, chh);
+    ctx.fillStyle = '#e8ecf4';
+    ctx.fillText(`${c.label} ${c.v}`, c.x + 6, c.y + 14);
+  }
+  ctx.fillStyle = '#66708a';
+  // axes: predicted (bottom) and actual (left)
+  ctx.fillText('pred 0', x0, h - 30); ctx.fillText('pred 1', x0 + cw + 4, h - 30);
+  ctx.fillText('actual 0', 2, 4 + chh / 2 + 2);
+  ctx.fillText('actual 1', 2, 4 + chh * 1.5 + 6);
+  // precision / recall
+  const prec = tp + fp > 0 ? (tp / (tp + fp)).toFixed(2) : '–';
+  const rec = tp + fn > 0 ? (tp / (tp + fn)).toFixed(2) : '–';
+  ctx.fillStyle = '#8b95ab';
+  ctx.fillText(`precision ${prec} · recall ${rec}`, x0, h - 8);
+}
+
+function drawActStrip() {
+  const { ctx, w, h } = ctx2d('actStrip');
+  const acts = state.net.lastActs;
+  const total = state.net.sizes.reduce((a, b) => a + b, 0);
+  let x = 4;
+  const gap = 2.5;
+  for (let l = 0; l < acts.length; l++) {
+    for (let i = 0; i < acts[l].length; i++) {
+      const bw = (w - 8 - gap * total) / total;
+      const a = acts[l][i];
+      const mag = Math.min(1, Math.abs(a));
+      const bh = mag * (h - 18);
+      ctx.fillStyle = a >= 0 ? `rgba(63,214,255,${0.25 + 0.75 * mag})` : `rgba(255,122,60,${0.25 + 0.75 * mag})`;
+      ctx.fillRect(x, h - 12 - bh, bw, bh);
+      x += bw + gap;
+    }
+  }
+  const probe = state.points.train[state.probeIdx % Math.max(1, state.points.train.length)];
+  ctx.fillStyle = '#66708a'; ctx.font = '10px monospace';
+  ctx.fillText(`sample x=${probe ? probe.x.toFixed(2) : '–'} y=${probe ? probe.y.toFixed(2) : '–'}  class=${probe ? probe.label : '–'}`, 6, h - 2);
+}
+
+// Training-phase inference: drives the header chip and the accuracy state,
+// expressed as text (never color alone).
+function computePhase() {
+  const h = state.history;
+  if (!h.length) return 'idle';
+  const last = h[h.length - 1];
+  if (h.length < 20) return 'learning';
+  const n200 = h.slice(-200);
+  const accChange = Math.abs(n200[n200.length - 1].acc - n200[0].acc);
+  const n300 = h.slice(-300);
+  const trainDrop = n300[0].trainLoss - n300[n300.length - 1].trainLoss;
+  const testRise = n300[n300.length - 1].testLoss > n300[0].testLoss + 0.02;
+  const minTrain = Math.min(...h.map(d => d.trainLoss));
+  if (last.trainLoss > minTrain * 1.5 && minTrain < 0.6) return 'diverging';
+  if (trainDrop > 0.02 && testRise) return 'overfit';
+  if (last.acc > 0.90 && accChange < 0.005) return 'converged';
+  if (last.acc <= 0.90 && accChange < 0.005) return 'plateaued';
+  return 'learning';
+}
+
+const PHASE_COLORS = {
+  idle: 'var(--text-dim)', learning: 'var(--accent)', converged: 'var(--good)',
+  plateaued: '#ffd166', overfit: 'var(--bad)', diverging: 'var(--bad)',
+};
+
+function refreshAnalytics() {
+  const { train, test } = state.points;
+  if (!train.length || !state.net) return;
+  const tl = state.net.lossAndAcc(train);
+  const te = state.net.lossAndAcc(test);
+  state.history.push({ step: state.step, trainLoss: tl.loss, testLoss: te.loss, acc: te.acc });
+  if (state.history.length > 600) state.history.shift();
+  state.confusion = [0, 0, 0, 0];
+  for (const p of test) {
+    const q = state.net.predict(p.x, p.y) >= 0.5 ? 1 : 0;
+    if (q === 1 && p.label === 1) state.confusion[0]++;
+    if (q === 1 && p.label === 0) state.confusion[1]++;
+    if (q === 0 && p.label === 1) state.confusion[2]++;
+    if (q === 0 && p.label === 0) state.confusion[3]++;
+  }
+  document.getElementById('mTrainLoss').textContent = tl.loss.toFixed(4);
+  document.getElementById('mTestLoss').textContent = te.loss.toFixed(4);
+  const accEl = document.getElementById('mAcc');
+  const phase = computePhase();
+  accEl.textContent = `${(te.acc * 100).toFixed(1)}% · ${phase}`;
+  accEl.style.color = te.acc > 0.9 ? 'var(--good)' : te.acc > 0.7 ? '#ffd166' : 'var(--bad)';
+  const chip = document.getElementById('phaseChip');
+  chip.textContent = phase;
+  chip.style.color = PHASE_COLORS[phase] || 'var(--text-dim)';
+  chip.style.borderColor = (phase === 'overfit' || phase === 'diverging')
+    ? 'rgba(248,113,113,.5)'
+    : (phase === 'converged' ? 'rgba(52,211,153,.5)' : 'rgba(63,214,255,.35)');
+  document.getElementById('epochLabel').textContent = `epoch ${state.epoch}`;
+  // Live screen-reader summaries for every chart.
+  const probe = state.points.train[state.probeIdx % Math.max(1, state.points.train.length)];
+  document.getElementById('lossChart').setAttribute('aria-label',
+    `Loss chart: train ${tl.loss.toFixed(3)}, test ${te.loss.toFixed(3)} over ${state.history.length} recorded points`);
+  document.getElementById('boundaryMap').setAttribute('aria-label',
+    `Decision boundary map with ${state.points.test.length} test points, accuracy ${(te.acc * 100).toFixed(1)} percent`);
+  document.getElementById('gradChart').setAttribute('aria-label',
+    `Gradient norms per layer: ${state.lastGradNorms.length
+      ? state.lastGradNorms.map((v, l) => `layer ${l} ${v.toExponential(1)}`).join(', ')
+      : 'not started'}`);
+  document.getElementById('histChart').setAttribute('aria-label',
+    `Weight distribution across all ${state.net.L} weight layers`);
+  document.getElementById('confusion').setAttribute('aria-label',
+    `Confusion matrix: ${state.confusion[0]} true positives, ${state.confusion[1]} false positives, ` +
+    `${state.confusion[2]} false negatives, ${state.confusion[3]} true negatives, ` +
+    `accuracy ${(te.acc * 100).toFixed(1)} percent`);
+  document.getElementById('actStrip').setAttribute('aria-label',
+    `Neuron activations for current sample${probe ? ` x ${probe.x.toFixed(2)}, y ${probe.y.toFixed(2)}, class ${probe.label}` : ''}`);
+  drawLossChart();
+  drawBoundaryMap();
+  drawGradChart();
+  drawHistChart();
+  drawConfusion();
+  drawActStrip();
+}
+
+// ============================================================================
+// Training loop + UI wiring
+// ============================================================================
+function parseArch(text) {
+  return text.split(/[,x\s]+/)
+    .map(s => parseInt(s, 10))
+    .filter(n => Number.isInteger(n) && n >= 1 && n <= 12)
+    .slice(0, 6);
+}
+
+function oneTrainStep() {
+  const { train } = state.points;
+  if (!train.length) return;
+  state.probeIdx = (state.probeIdx + 1) % train.length;
+  const probe = train[state.probeIdx];
+  const batch = [];
+  for (let i = 0; i < state.batch; i++) batch.push(train[(Math.random() * train.length) | 0]);
+  const res = state.net.trainStep(batch, probe);
+  state.step++;
+  state.epoch = Math.floor(state.step * state.batch / Math.max(1, train.length));
+  state.lastGradNorms = res.gradNorms;
+
+  // Snapshot the REAL per-edge |gradients| (trainStep leaves dW populated) so
+  // the backward wave ranks, scales and colors edges by actual ∂L/∂w.
+  const m = batch.length;
+  let gMax = 1e-12;
+  state.lastGradEdge = [];
+  for (let l = 0; l < state.net.L; l++) {
+    const nOut = state.net.sizes[l + 1];
+    const arr = new Float64Array(edgeIndex[l].length);
+    for (let k = 0; k < edgeIndex[l].length; k++) {
+      const e = edgeIndex[l][k];
+      const g = Math.abs(state.net.dW[l][e.i * nOut + e.j] / m);
+      arr[k] = g;
+      if (g > gMax) gMax = g;
+    }
+    state.lastGradEdge.push(arr);
+  }
+  state.gradAbsMax = gMax;
+
+  updateEdgeColors();
+  const L = state.net.L;
+  const waveDur = WAVE_BASE_DUR / Math.max(0.05, state.waveSpeed);
+  launchWave(+1);
+  const bwdDelay = L * waveDur * 550;
+  const launched = launchWave(-1, bwdDelay);
+  if (launched) {
+    // While the backward wave flows, edges glow with real gradients; restore
+    // weight colors once it has passed through every layer.
+    setTimeout(updateEdgeColorsGrad, bwdDelay);
+    setTimeout(updateEdgeColors, bwdDelay + L * waveDur * 1000 + waveDur * 700);
+  }
+}
+
+function updateStatus() {
+  document.getElementById('sStep').textContent = state.step;
+  document.getElementById('sEpoch').textContent = state.epoch;
+  document.getElementById('sParams').textContent = state.net.paramCount;
+  document.getElementById('sLr').textContent = state.lr;
+  document.getElementById('sData').textContent = `${state.datasetName} · ${state.points.train.length + state.points.test.length} pts`;
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 6000);
+}
+
+document.getElementById('btnPlay').onclick = () => {
+  state.playing = !state.playing;
+  document.getElementById('btnPlay').textContent = state.playing ? '⏸ Pause' : '▶ Train';
+};
+document.getElementById('btnStep').onclick = () => { oneTrainStep(); refreshAnalytics(); updateStatus(); };
+document.getElementById('btnResetWeights').onclick = () => rebuildNetwork();
+
+document.getElementById('dataset').onchange = (e) => {
+  state.datasetName = e.target.value; rebuildData(); rebuildNetwork();
+  saveSettings();
+};
+document.getElementById('noise').oninput = (e) => {
+  state.noise = e.target.value / 100;
+  document.getElementById('noiseVal').textContent = state.noise.toFixed(2);
+  saveSettings();
+};
+document.getElementById('btnRegen').onclick = () => {
+  state.dataSeed = (Math.random() * 1e6) | 0;
+  rebuildData(); rebuildNetwork();
+};
+document.getElementById('arch').onchange = (e) => {
+  const archErr = document.getElementById('archErr');
+  const parsed = parseArch(e.target.value);
+  if (!parsed.length) {
+    // Inline, right next to the field — not the distant sidebar banner.
+    archErr.textContent = 'Use e.g. "8, 8" (1–12 neurons, ≤6 layers)';
+    e.target.value = state.arch.join(', ');
+    return;
+  }
+  archErr.textContent = '';
+  e.target.value = parsed.join(', ');
+  state.arch = parsed; rebuildNetwork();
+  saveSettings();
+};
+document.getElementById('activation').onchange = (e) => { state.activation = e.target.value; rebuildNetwork(); saveSettings(); };
+document.getElementById('features').onchange = (e) => { state.features = e.target.value; rebuildNetwork(); saveSettings(); };
+document.getElementById('optimizer').onchange = (e) => { state.optimizer = e.target.value; rebuildNetwork(); saveSettings(); };
+document.getElementById('lr').onchange = (e) => {
+  state.lr = parseFloat(e.target.value); state.net.lr = state.lr;
+  saveSettings();
+};
+document.getElementById('batch').onchange = (e) => { state.batch = parseInt(e.target.value, 10); saveSettings(); };
+document.getElementById('trainSpeed').oninput = (e) => {
+  state.trainSpeed = parseInt(e.target.value, 10);
+  document.getElementById('trainSpeedVal').textContent = state.trainSpeed + '×';
+  saveSettings();
+};
+document.getElementById('waveSpeed').oninput = (e) => {
+  state.waveSpeed = parseFloat(e.target.value);
+  document.getElementById('waveSpeedVal').textContent = state.waveSpeed + '×';
+  saveSettings();
+};
+document.getElementById('btnSurface').onclick = (e) => {
+  state.showSurface = !state.showSurface;
+  e.target.classList.toggle('primary', state.showSurface);
+  if (surfaceMesh) { surfaceMesh.visible = state.showSurface; if (state.showSurface) updateDecisionSurface(); }
+  saveSettings();
+};
+document.getElementById('btnLogScale').onclick = (e) => {
+  lossLog = !lossLog;
+  e.target.classList.toggle('primary', lossLog);
+  drawLossChart();
+  saveSettings();
+};
+document.getElementById('btnAutoRotate').onclick = (e) => {
+  state.autoRotate = !state.autoRotate;
+  controls.autoRotate = state.autoRotate;
+  e.target.classList.toggle('primary', state.autoRotate);
+};
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+let lastT = performance.now(), fpsT = performance.now(), frames = 0;
+let lastAnalyticsStep = 0;
+
+function tick(now) {
+  const dtMs = Math.min(50, now - lastT);
+  lastT = now;
+
+  if (state.playing) {
+    for (let i = 0; i < state.trainSpeed; i++) oneTrainStep();
+    if (state.step - lastAnalyticsStep >= Math.max(4, state.trainSpeed * 2)) {
+      refreshAnalytics();
+      updateStatus();
+      lastAnalyticsStep = state.step;
+      if (state.showSurface) updateDecisionSurface();
+    }
+  }
+
+  updatePulses(dtMs);
+  updateNeuronGlow();
+  controls.update();
+  renderer.render(scene, camera);
+
+  frames++;
+  if (now - fpsT > 1000) {
+    state.fps = frames; frames = 0; fpsT = now;
+    document.getElementById('sFps').textContent = state.fps;
+  }
+  requestAnimationFrame(tick);
+}
+
+// ---- settings persistence (localStorage, best-effort) ----
+const SETTINGS_KEY = 'nn-lab-settings';
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      datasetName: state.datasetName, noise: state.noise, arch: state.arch,
+      activation: state.activation, optimizer: state.optimizer,
+      features: state.features, lr: state.lr, batch: state.batch,
+      trainSpeed: state.trainSpeed, waveSpeed: state.waveSpeed,
+      showSurface: state.showSurface, lossLog,
+    }));
+  } catch (_) { /* storage unavailable (some file:// contexts) */ }
+}
+
+function loadSettings() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null'); } catch (_) {}
+  if (!s) return;
+  if (typeof s.datasetName === 'string') state.datasetName = s.datasetName;
+  if (typeof s.noise === 'number') state.noise = Math.min(0.5, Math.max(0, s.noise));
+  if (Array.isArray(s.arch) && s.arch.length) state.arch = s.arch.slice(0, 6);
+  if (s.activation === 'tanh' || s.activation === 'relu') state.activation = s.activation;
+  if (s.optimizer === 'adam' || s.optimizer === 'sgd') state.optimizer = s.optimizer;
+  if (s.features === 'basic' || s.features === 'extended') state.features = s.features;
+  if (typeof s.lr === 'number' && s.lr > 0) state.lr = s.lr;
+  if (typeof s.batch === 'number' && s.batch >= 1) state.batch = s.batch;
+  if (typeof s.trainSpeed === 'number') state.trainSpeed = Math.min(40, Math.max(1, s.trainSpeed));
+  if (typeof s.waveSpeed === 'number') state.waveSpeed = Math.min(3, Math.max(0.25, s.waveSpeed));
+  if (typeof s.showSurface === 'boolean') state.showSurface = s.showSurface;
+  if (typeof s.lossLog === 'boolean') lossLog = s.lossLog;
+  // Reflect loaded values in the DOM controls.
+  document.getElementById('dataset').value = state.datasetName;
+  document.getElementById('noise').value = Math.round(state.noise * 100);
+  document.getElementById('noiseVal').textContent = state.noise.toFixed(2);
+  document.getElementById('arch').value = state.arch.join(', ');
+  document.getElementById('activation').value = state.activation;
+  document.getElementById('optimizer').value = state.optimizer;
+  document.getElementById('features').value = state.features;
+  document.getElementById('lr').value = String(state.lr);
+  document.getElementById('batch').value = String(state.batch);
+  document.getElementById('trainSpeed').value = state.trainSpeed;
+  document.getElementById('trainSpeedVal').textContent = state.trainSpeed + '×';
+  document.getElementById('waveSpeed').value = state.waveSpeed;
+  document.getElementById('waveSpeedVal').textContent = state.waveSpeed + '×';
+  document.getElementById('btnSurface').classList.toggle('primary', state.showSurface);
+  document.getElementById('btnLogScale').classList.toggle('primary', lossLog);
+}
+
+// ---- boot ----
+loadSettings();
+rebuildData();
+state.net = new MLP([state.features === 'extended' ? 7 : 2, ...state.arch, 1], {
+  activation: state.activation, optimizer: state.optimizer,
+  features: state.features, lr: state.lr, seed: 42,
+});
+buildSceneNetwork();
+refreshAnalytics();
+updateStatus();
+resize();
+requestAnimationFrame(tick);
+
+// Help overlay + keyboard shortcuts.
+const helpOverlay = document.getElementById('helpOverlay');
+function toggleHelp(force) {
+  const open = force !== undefined ? force : !helpOverlay.classList.contains('open');
+  helpOverlay.classList.toggle('open', open);
+  if (open) document.getElementById('btnHelpClose').focus();
+}
+document.getElementById('btnHelpClose').onclick = () => toggleHelp(false);
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (helpOverlay.classList.contains('open')) toggleHelp(false);
+    return;
+  }
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '')) return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    document.getElementById('btnPlay').click();
+  } else if (e.key === 's' || e.key === 'S') {
+    document.getElementById('btnStep').click();
+  } else if (e.key === 'r' || e.key === 'R') {
+    document.getElementById('btnRegen').click();
+  } else if (e.key >= '1' && e.key <= '5') {
+    const sel = document.getElementById('dataset');
+    const idx = parseInt(e.key, 10) - 1;
+    if (idx < sel.options.length) {
+      sel.selectedIndex = idx;
+      sel.dispatchEvent(new Event('change'));
+    }
+  } else if (e.key === 'f' || e.key === 'F') {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen();
+  } else if (e.key === '?') {
+    toggleHelp();
+  }
+});
+</script>
+</body>
+</html>
