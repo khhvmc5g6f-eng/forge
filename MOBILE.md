@@ -23,7 +23,7 @@ Opt-in live test against a real hub: `FORGE_LIVE_HUB=http://127.0.0.1:8787 flutt
 - Voice never approves tool calls; approvals always need a tap.
 
 ## Verified (2026-09-29)
-Flutter analyze clean; 177 tests pass (Forge's existing suite + 31 for the client). Debug builds: Android APK, macOS app, iOS simulator app. Live: Dart client <-> real Cline hub <-> local Ollama model streamed a reply; the iPhone 17 Pro simulator UI connected to the hub and completed a chat turn with the user message, streamed reply and token usage displayed.
+Flutter analyze clean; 176 tests pass, 1 opt-in live test skipped by default (Forge's existing suite plus the client tests). Debug builds: Android APK, macOS app, iOS simulator app. Live: Dart client <-> real Cline hub <-> local Ollama model streamed a reply; the iPhone 17 Pro simulator UI connected to the hub and completed a chat turn with the user message, streamed reply and token usage displayed.
 
 ## Not verified / not built
 Physical devices; Android emulator run; iPad layout; push/background notifications; on-device speech recognition (needs a device or simulator with dictation - the plumbing and permissions are in place, but it was not exercised); per-tool approval policies (the hub `send` config only exposes `autoApproveTools`, so the app has four autonomy levels, not the CLI's five); bundle id is still the Flutter placeholder `com.example.forge`.
