@@ -89,12 +89,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Connect to your Cline hub',
+                  'Connect to Forge',
                   style: theme.textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'This app is a remote control. The agent runs on your Mac; start the hub there with `bun run start` in apps/cline-hub.',
+                  'This app is a remote control. The Forge engine runs on your Mac; start its hub there with `bun run start` in apps/cline-hub.',
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 24),

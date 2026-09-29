@@ -52,7 +52,7 @@ void main() {
     await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp(forceMobile: true)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Connect to your Cline hub'), findsOneWidget);
+    expect(find.text('Connect to Forge'), findsOneWidget);
     expect(find.text('Hub address'), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
   });

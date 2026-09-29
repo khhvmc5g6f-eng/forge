@@ -78,7 +78,7 @@ class _ChatViewState extends State<ChatView> {
                       child: Padding(
                         padding: EdgeInsets.all(24),
                         child: Text(
-                          'Ask Cline to work on the project running on your Mac.',
+                          'Ask Forge to work on the project running on your Mac.',
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -346,7 +346,7 @@ class _Composer extends StatelessWidget {
                 maxLines: 6,
                 textInputAction: TextInputAction.newline,
                 decoration: InputDecoration(
-                  hintText: '${controller.autonomy.label} · message Cline',
+                  hintText: '${controller.autonomy.label} · message Forge',
                   border: const OutlineInputBorder(
                     borderRadius: BorderRadius.all(Radius.circular(20)),
                   ),

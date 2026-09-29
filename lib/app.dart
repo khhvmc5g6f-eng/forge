@@ -9,7 +9,7 @@ import 'ui/shell/forge_shell.dart';
 ///
 /// Phones (iOS/Android) get the remote-control workspace that drives the
 /// Cline-Enhanced engine running on your Mac. Desktop keeps the full Forge
-/// workstation shell, which also has a "Cline Hub" section using the same client.
+/// workstation shell, which also has a "Forge Engine" section using the same client.
 class MyApp extends StatelessWidget {
   const MyApp({super.key, this.forceMobile});
 
