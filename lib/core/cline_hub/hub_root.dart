@@ -8,6 +8,7 @@ import 'ui/connect_screen.dart';
 import 'ui/hub_view.dart';
 import 'ui/sessions_view.dart';
 import 'ui/settings_view.dart';
+import 'voice/voice_panel.dart';
 
 /// Connect screen until a hub is reachable, then the remote-control workspace
 /// (Chat / Sessions / Hub / Settings). Used full-screen on phones and embedded
@@ -77,6 +78,8 @@ class _HubWorkspaceState extends State<HubWorkspace> {
 
   static const _destinations = [
     (Icons.chat_bubble_outline, Icons.chat_bubble, 'Chat'),
+    (Icons.graphic_eq, Icons.graphic_eq, 'Voice'),
+    (Icons.graphic_eq, Icons.graphic_eq, 'Voice'),
     (Icons.history, Icons.history, 'Sessions'),
     (Icons.dns_outlined, Icons.dns, 'Hub'),
     (Icons.tune, Icons.tune, 'Settings'),
@@ -87,6 +90,7 @@ class _HubWorkspaceState extends State<HubWorkspace> {
     final s = widget.services;
     final pages = [
       ChatView(controller: s.controller, voice: s.voice),
+      VoicePanel(services: s),
       SessionsView(
         controller: s.controller,
         onOpen: () => setState(() => _tab = 0),

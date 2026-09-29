@@ -64,6 +64,15 @@ class HubEndpoint {
 
   Uri get healthUri => baseUrl.replace(path: '/health');
 
+  /// WebSocket URI for another path on the same server (e.g. the voice gateway's `/voice`).
+  Uri webSocketUriFor(String path) => Uri(
+    scheme: baseUrl.scheme == 'https' ? 'wss' : 'ws',
+    host: baseUrl.host,
+    port: baseUrl.hasPort ? baseUrl.port : null,
+    path: path,
+    queryParameters: roomSecret == null ? null : {'roomSecret': roomSecret!},
+  );
+
   Uri get webSocketUri => Uri(
     scheme: baseUrl.scheme == 'https' ? 'wss' : 'ws',
     host: baseUrl.host,

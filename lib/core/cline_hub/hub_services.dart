@@ -4,6 +4,10 @@ import 'protocol/hub_client.dart';
 import 'protocol/hub_endpoint.dart';
 import 'services/settings_store.dart';
 import 'services/voice_service.dart';
+import 'voice/audio_capture.dart';
+import 'voice/tts_speaker.dart';
+import 'voice/voice_gateway_client.dart';
+import 'voice/voice_ui_controller.dart';
 import 'state/session_controller.dart';
 import 'state/voice_controller.dart';
 
@@ -16,6 +20,7 @@ class HubServices {
     SettingsStore? store,
     VoiceService? voiceService,
     HubClient? client,
+    VoiceUiController? voiceUiOverride,
   }) : store = store ?? PlatformSettingsStore(),
        client = client ?? HubClient() {
     controller = SessionController(
@@ -31,10 +36,18 @@ class HubServices {
       voiceService ?? PlatformVoiceService(),
       onUtterance: (t) => controller.send(t),
     );
+    voiceUi =
+        voiceUiOverride ??
+        VoiceUiController(
+          client: VoiceGatewayClient(),
+          capture: RecordAudioCapture(),
+          speaker: FlutterTtsSpeaker(),
+        );
   }
 
   final SettingsStore store;
   final HubClient client;
+  late final VoiceUiController voiceUi;
   late final SessionController controller;
   late final VoiceController voice;
 
@@ -63,6 +76,7 @@ class HubServices {
   }
 
   void dispose() {
+    voiceUi.dispose();
     voice.dispose();
     controller.dispose();
     client.dispose();

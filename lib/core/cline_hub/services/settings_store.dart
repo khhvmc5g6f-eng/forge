@@ -28,6 +28,8 @@ abstract class SettingsStore {
   Future<void> clearConnection();
   Future<AppPrefs> loadPrefs();
   Future<void> savePrefs(AppPrefs p);
+  Future<int> loadVoicePort();
+  Future<void> saveVoicePort(int port);
 }
 
 class PlatformSettingsStore implements SettingsStore {
@@ -102,9 +104,22 @@ class PlatformSettingsStore implements SettingsStore {
     await put('autonomy', a.autonomy);
     await p.setBool('speak', a.speakReplies);
   }
+
+  @override
+  Future<int> loadVoicePort() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getInt('voice_port') ?? 8790;
+  }
+
+  @override
+  Future<void> saveVoicePort(int port) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setInt('voice_port', port);
+  }
 }
 
 class MemorySettingsStore implements SettingsStore {
+  int voicePort = 8790;
   SavedConnection? connection;
   AppPrefs prefs = const AppPrefs();
   @override
@@ -117,4 +132,8 @@ class MemorySettingsStore implements SettingsStore {
   Future<AppPrefs> loadPrefs() async => prefs;
   @override
   Future<void> savePrefs(AppPrefs p) async => prefs = p;
+  @override
+  Future<int> loadVoicePort() async => voicePort;
+  @override
+  Future<void> saveVoicePort(int port) async => voicePort = port;
 }
