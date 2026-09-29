@@ -18,6 +18,9 @@ dependencies:
   meta: ^1.16.0
   collection: ^1.19.1
   flutter_secure_storage: ^11.2.0
+  speech_to_text: ^7.5.0
+  flutter_tts: ^4.2.5
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

@@ -28,5 +28,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Used for dictating messages to the coding agent.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Used to turn your speech into a prompt for the coding agent.</string>
 </dict>
 </plist>

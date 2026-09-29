@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -28,7 +29,7 @@ List<Override> _testOverrides() => [
 
 void main() {
   testWidgets('ForgeShell renders every sidebar section and defaults to Tasks', (tester) async {
-    await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp()));
+    await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp(forceMobile: false)));
     await tester.pumpAndSettle();
 
     for (final section in SidebarSection.values) {
@@ -38,12 +39,21 @@ void main() {
   });
 
   testWidgets('selecting a sidebar destination switches the visible panel', (tester) async {
-    await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp()));
+    await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp(forceMobile: false)));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Git'));
     await tester.pumpAndSettle();
 
     expect(find.text('Current branch'), findsOneWidget);
+  });
+
+  testWidgets('phones start on the hub connect screen, not the desktop shell', (tester) async {
+    await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp(forceMobile: true)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Connect to your Cline hub'), findsOneWidget);
+    expect(find.text('Hub address'), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
   });
 }

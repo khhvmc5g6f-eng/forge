@@ -8,6 +8,17 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Forge</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Used for dictating messages to the coding agent. Audio is processed on-device where supported.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Used to turn your speech into a prompt for the coding agent.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Connects to the Forge engine (Cline hub) running on a computer on your network.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

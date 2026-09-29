@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/cline_hub/hub_root.dart';
 import '../panels/agents_panel.dart';
 import '../panels/browser_panel.dart';
 import '../panels/control_centre_panel.dart';
@@ -85,6 +86,8 @@ class ForgeShell extends ConsumerWidget {
     switch (section) {
       case SidebarSection.projects:
         return const ProjectsPanel();
+      case SidebarSection.clineHub:
+        return const HubRoot(embedded: true);
       case SidebarSection.agents:
         return const AgentsPanel();
       case SidebarSection.tasks:

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 /// order in the [NavigationRail].
 enum SidebarSection {
   projects(Icons.folder_outlined, 'Projects'),
+  clineHub(Icons.cast_connected_outlined, 'Cline Hub'),
   agents(Icons.smart_toy_outlined, 'Agents'),
   tasks(Icons.checklist_outlined, 'Tasks'),
   git(Icons.merge_type_outlined, 'Git'),
