@@ -113,3 +113,15 @@ Note `key.update` covers priority, enable/disable of keys and providers; the cli
 See `CONTROL_PLANE.md`, "Migration to the engine". Short version: `CircuitBreaker`, `CircuitBreakerRegistry`,
 `CredentialVault`, `CapabilityRouter` are deprecated and no longer used by any UI; `SupervisorEngine`, `TaskGraph` and
 `ModelTier` stay because the engine has no equivalent (supervisor/worker task-graph dispatch, directive 24-26).
+
+## 7. Verification (2026-10-03)
+
+* Client unit/integration tests run against a fake HTTP + SSE engine written in the test (`test/forge_engine/fake_engine.dart`).
+* **Opt-in live test against the real TypeScript engine** (`test/forge_engine/live_engine_test.dart`): ran green against
+  `bun scripts/forge-gateway.ts --port 8791 --memory-secrets --ollama`. It parsed the real `/forge/state`, opened the real SSE
+  stream, drove a real `/v1/chat/completions` request and saw the real `MODEL_REQUEST_STARTED -> KEY_SELECTED -> FAILED` events
+  (typed correctly, agent id taken from `x-forge-agent`), and discovered the engine as read-only (`/forge/api/v1/capabilities` is a 404).
+* The iOS Simulator build (iPhone 17 Pro) connected to that engine over `127.0.0.1:8791`: dashboard, live-events pill and
+  "read-only engine" badge rendered from real data.
+* Not verified: bearer auth (not in the engine yet), the action API (does not exist), physical devices, a non-loopback
+  tunnel, notification permission prompts, Android emulator run.

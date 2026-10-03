@@ -35,7 +35,7 @@ class _ConnectPageState extends ConsumerState<ConnectPage> {
     final p = parsePairing(text);
     if (p == null) return;
     setState(() {
-      _address.text = p.endpoint.toPairingString().replaceAll(RegExp(r'\?.*'), '');
+      _address.text = p.endpoint.baseUri.toString();
       if (p.token != null) _token.text = p.token!;
     });
   }
@@ -69,7 +69,7 @@ class _ConnectPageState extends ConsumerState<ConnectPage> {
     final conn = ref.watch(engineConnectionProvider);
     if (!_prefilled && conn.endpoint != null) {
       _prefilled = true;
-      _address.text = conn.endpoint!.toPairingString().replaceAll(RegExp(r'\?.*'), '');
+      _address.text = conn.endpoint!.baseUri.toString();
     }
     final p = _parsed;
     final scheme = Theme.of(context).colorScheme;

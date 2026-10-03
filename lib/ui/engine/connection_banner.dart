@@ -47,7 +47,7 @@ class ConnectionBanner extends StatelessWidget {
         }
       case EngineLinkStatus.reconnecting:
         text = 'Engine ${c.endpoint?.label ?? ''} is not answering (${c.error ?? 'no reason given'}). '
-            'Retry ${c.retryAttempt}${c.nextRetryAt == null ? '' : ' in ${fmtDuration(c.nextRetryAt!.difference(DateTime.now()))}'}.'
+            'Retrying with backoff (attempt ${c.retryAttempt}).'
             '${c.state == null ? '' : ' Showing data from ${at == null ? 'an earlier poll' : fmtClock(at)}, which may be out of date.'}';
         icon = Icons.cloud_off_outlined;
       case EngineLinkStatus.unauthorized:
