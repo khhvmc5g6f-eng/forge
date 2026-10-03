@@ -38,7 +38,11 @@ class FlowRequest {
   int? ttftMs, latencyMs, outputTokens;
   final List<FlowFailover> failovers = [];
 
-  bool get inFlight => stage != FlowStage.complete && stage != FlowStage.failed;
+  /// Seen only through SSE replay of old events: never shown as in flight.
+  bool historical = false;
+
+  bool get inFlight => !historical && stage != FlowStage.complete && stage != FlowStage.failed;
+  bool get terminal => stage == FlowStage.complete || stage == FlowStage.failed;
 }
 
 class FlowTool {
@@ -69,6 +73,7 @@ class LiveFlowModel {
   int revision = 0;
 
   List<FlowRequest> get inFlight => _byId.values.where((r) => r.inFlight).toList(growable: false);
+  int get trackedCount => _byId.length;
   List<FlowRequest> get recent => List.unmodifiable(_recent);
   List<FlowTool> get toolsInFlight => _tools.values.where((t) => t.inFlight).toList(growable: false);
   List<FlowTool> get recentTools => List.unmodifiable(_recentTools);
@@ -97,7 +102,7 @@ class LiveFlowModel {
         _tag(r, e);
         r.modelId = jStr(e.data['modelId']) ?? r.modelId;
         r.stage = FlowStage.uploading;
-        if (old) _finish(r, e.ts, FlowStage.failed, 'no completion seen (replayed history)');
+        if (old) r.historical = true;
       case 'KEY_SELECTED':
         final r = _byId.putIfAbsent(id, () => FlowRequest(requestId: id, startedAt: e.ts));
         _tag(r, e);
@@ -153,6 +158,10 @@ class LiveFlowModel {
   void reconcile(Set<String> activeRequestIds, {required DateTime now, Duration grace = const Duration(seconds: 15)}) {
     var changed = false;
     for (final r in _byId.values.toList()) {
+      if (r.historical && now.difference(r.startedAt) > historyAfter * 2) {
+        _byId.remove(r.requestId);
+        continue;
+      }
       if (r.inFlight && !activeRequestIds.contains(r.requestId) && now.difference(r.startedAt) > grace) {
         _finish(r, now, FlowStage.failed, 'engine no longer lists it as active');
         changed = true;
