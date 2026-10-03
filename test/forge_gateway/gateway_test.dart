@@ -24,6 +24,16 @@ void main() {
     expect(s.openCircuits, 1);
   });
 
+  test('parses the real gateway key shape', () {
+    final k = GatewayKey.fromJson({
+      'id': 'k', 'providerId': 'p', 'circuit': {'state': 'open'},
+      'health': {'score': 82.5}, 'last15m': {'calls': 4}, 'p50LatencyMs': 120,
+    });
+    expect(k.requests15m, 4);
+    expect(k.healthScore, 82.5);
+    expect(k.circuitState, 'open');
+  });
+
   test('malformed events are rejected', () {
     expect(GatewayEvent.tryParse({'type': 'FAILOVER'}), isNull);
     expect(GatewayEvent.tryParse('x'), isNull);

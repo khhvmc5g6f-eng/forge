@@ -27,7 +27,7 @@ class GatewayKey {
       enabled: j['enabled'] != false,
       circuitState: circuit is Map ? circuit['state'] as String? : null,
       healthScore: health is Map ? _num(health['score']) : null,
-      requests15m: win is Map ? _num(win['requests'])?.toInt() : null,
+      requests15m: win is Map ? _num(win['calls'])?.toInt() : null,
       p50LatencyMs: _num(j['p50LatencyMs']),
       p95LatencyMs: _num(j['p95LatencyMs']),
     );
