@@ -279,9 +279,16 @@ class EngineClient {
     throw EngineException(EngineErrorKind.malformed, 'The engine answered with something that is not Forge state JSON.');
   }
 
-  /// Never let the bearer token appear in an error string.
+  /// Short, readable network error with the token removed. `SocketException`
+  /// detail is reduced to the OS message (e.g. "Connection refused").
   String _scrub(Object e) {
     var s = '$e';
+    final os = RegExp(r'OS Error: ([^,)]+)').firstMatch(s);
+    if (os != null) {
+      s = os.group(1)!.trim();
+    } else if (s.length > 140) {
+      s = '${s.substring(0, 140)}…';
+    }
     final t = token;
     if (t != null && t.isNotEmpty) s = s.replaceAll(t, '***');
     return s;

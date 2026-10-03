@@ -31,6 +31,15 @@ void main() {
       expect(parsePairing('ftp://x'), isNull);
       expect(parsePairing('http://'), isNull);
       expect(parsePairing('host:99999'), isNull);
+      // half-typed addresses must not connect to something unintended
+      expect(parsePairing('127.0.0.'), isNull);
+      expect(parsePairing('127.0.0'), isNull);
+      expect(parsePairing('300.1.1.1'), isNull);
+      expect(parsePairing('host..name'), isNull);
+      expect(parsePairing('-bad.example.com'), isNull);
+      expect(parsePairing('127.0.0.1:8791')!.endpoint.host, '127.0.0.1');
+      expect(parsePairing('my-mac.local:8765')!.endpoint.host, 'my-mac.local');
+      expect(parsePairing('http://[::1]:8765')!.endpoint.isLoopback, isTrue);
     });
 
     test('round trips through toPairingString', () {

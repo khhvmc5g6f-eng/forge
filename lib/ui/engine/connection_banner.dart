@@ -69,7 +69,7 @@ class ConnectionBanner extends StatelessWidget {
           child: Row(children: [
             Icon(icon, size: 18, color: onColor),
             const SizedBox(width: 8),
-            Expanded(child: Text(text, style: TextStyle(color: onColor, fontSize: 13))),
+            Expanded(child: Text(text, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(color: onColor, fontSize: 13))),
           ]),
         ),
       ),

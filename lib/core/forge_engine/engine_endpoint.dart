@@ -78,7 +78,7 @@ ParsedPairing? parsePairing(String input) {
   if (text.isEmpty) return null;
   if (!text.contains('://')) text = 'http://$text';
   final uri = Uri.tryParse(text);
-  if (uri == null || uri.host.isEmpty) return null;
+  if (uri == null || uri.host.isEmpty || !_validHost(uri.host)) return null;
   final scheme = uri.scheme.toLowerCase();
   if (scheme != 'forge' && scheme != 'http' && scheme != 'https') return null;
   final tls = scheme == 'https' || uri.queryParameters['tls'] == '1' || uri.queryParameters['tls'] == 'true';
@@ -95,4 +95,17 @@ ParsedPairing? parsePairing(String input) {
     ),
     token: (token == null || token.isEmpty) ? null : token,
   );
+}
+
+final _ipv4Chars = RegExp(r'^[0-9.]+$');
+final _hostLabel = RegExp(r'^[A-Za-z0-9_]([A-Za-z0-9_-]*[A-Za-z0-9_])?$');
+
+/// Rejects half-typed addresses such as `127.0.0.` or `host..name`.
+bool _validHost(String host) {
+  if (host.contains(':')) return RegExp(r'^[0-9A-Fa-f:.]+$').hasMatch(host); // IPv6
+  if (_ipv4Chars.hasMatch(host)) {
+    final parts = host.split('.');
+    return parts.length == 4 && parts.every((p) => p.isNotEmpty && p.length <= 3 && int.parse(p) <= 255);
+  }
+  return host.length <= 253 && host.split('.').every(_hostLabel.hasMatch);
 }
