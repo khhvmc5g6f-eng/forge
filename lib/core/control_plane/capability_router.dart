@@ -1,3 +1,10 @@
+// DEPRECATED (TD-004): the Forge control plane lives in the TypeScript engine
+// (sdk/packages/forge/src/router.ts KeyRouter + capability-registry.ts). The Flutter UI no longer uses this; it is a client of the engine
+// (lib/core/forge_engine). Nothing here is deleted yet because the standalone
+// Dart CLI/tests may still reference it; see CONTROL_PLANE.md "Migration to the
+// engine" for the removal plan and which parts have no engine equivalent.
+// ignore_for_file: deprecated_member_use_from_same_package
+
 import '../models/model_provider.dart';
 import '../models/model_registry.dart';
 import '../models/model_router.dart';
@@ -21,6 +28,7 @@ class NoHealthyModelForTierException implements Exception {
 /// circuit is `OPEN`, and, critically, **never relaxing task requirements to
 /// find a candidate** ("If a vision model fails, fail over to another VISION
 /// model... Failover must preserve task requirements").
+@Deprecated('Use the Forge engine (sdk/packages/forge/src/router.ts KeyRouter + capability-registry.ts) through lib/core/forge_engine. See CONTROL_PLANE.md, Migration to the engine.')
 class CapabilityRouter {
   CapabilityRouter({
     required this.modelRegistry,

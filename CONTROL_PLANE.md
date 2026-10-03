@@ -1,5 +1,34 @@
 # Multi-Provider Control Plane
 
+> **Status (2026-10-03, TD-004): the control plane lives in the TypeScript engine.** This document describes the earlier
+> in-app Dart implementation (`lib/core/control_plane/`). The Flutter app is now a **client** of the engine
+> (`lib/core/forge_engine/`, screens in `lib/ui/engine/`, API in `docs/ENGINE_API.md`). Read "Migration to the engine"
+> below before touching anything under `lib/core/control_plane/`.
+
+## Migration to the engine
+
+| Dart (this repo) | Engine equivalent (`/Volumes/Mac Laptop/Forge/sdk/packages/forge/src`) | Status here |
+|---|---|---|
+| `CircuitBreaker`, `CircuitBreakerRegistry` | `circuit.ts` (`CircuitBoard`, three levels provider/key/model, probes, manual disable/enable/reset) | **deprecated** (`@Deprecated`), unused by the UI |
+| `CredentialVault` | `vault.ts` (`ApiVault`, secrets only in the OS credential store) | **deprecated**, unused by the UI |
+| `CapabilityRouter` | `router.ts` (`KeyRouter`: policies, failover ladder) + `capability-registry.ts` | **deprecated**, unused by the UI |
+| `lib/ui/panels/control_centre_panel.dart` | Control Centre screens in `lib/ui/engine/` | **removed** (replaced) |
+| `lib/core/forge_gateway/*`, `gateway_panel.dart` (read-only gateway observer) | `lib/core/forge_engine/*` (superset: typed client, auth, SSE reconnect) | **removed** (replaced) |
+| `ModelTier` / `TierRegistry`, `TaskGraph`, `SupervisorEngine` | **none**: the engine has no supervisor/worker task-graph dispatch or empirical tiering yet (directive 24-26, workstream B2) | **kept, not deprecated**; revisit when the engine grows it |
+| `lib/core/models/**` (provider adapters, `ModelRouter`, `ModelRegistry`, `TaskClassifier`) | the engine routes through its gateway, but the standalone CLI (`bin/forge.dart`: `ask`, `models`, `task`, `review`) still calls providers directly | **kept**: standalone CLI needs it |
+| `lib/core/agents/**`, `tools/**`, `tasks/**`, `git/**`, `mcp/**`, ... | not part of the control plane | untouched |
+
+Removal plan: once nothing outside `test/core/control_plane/` references the deprecated classes (CLI audit: it does not
+today), delete `circuit_breaker*.dart`, `credential_vault.dart`, `capability_router.dart` and their tests together. Do not
+delete `SupervisorEngine`/`TaskGraph`/`ModelTier` until the engine has an equivalent.
+
+Dart-only behaviours with no engine equivalent that are lost from the UI by this migration: manual tier pinning, per-provider
+"Test" that calls `ModelProvider.healthCheck()` (the engine tests keys instead, via the proposed `key.test` action), and the
+"never auto-rotate on rate limit" credential rule (the engine's key router deliberately fails over between keys; that policy
+difference should be reviewed on the engine side).
+
+---
+
 This document covers the extension added on top of the original FORGE build: the
 federated, circuit-breaker-protected, tiered supervisor/worker architecture described in
 the Control Plane specification. It extends — does not replace — `PROVIDERS.md`,
@@ -92,7 +121,7 @@ Plus, wired into the pre-existing engine rather than duplicating it:
 - Five new provider adapters (`lib/core/models/providers/additional_providers.dart`):
   Groq, Cerebras, OpenRouter, Z.AI, Google — all thin `OpenAiCompatibleProvider`
   subclasses, base URLs verified current as of this writing.
-- The Control Centre UI (`lib/ui/panels/control_centre_panel.dart`) — live provider/model
+- (Removed, see Migration) The former Control Centre UI (`lib/ui/panels/control_centre_panel.dart`) — live provider/model
   circuit states with manual Test/Open/Close/Reset controls and tier pinning, plus
   Credential Vault management (add/remove/set-active-slot).
 

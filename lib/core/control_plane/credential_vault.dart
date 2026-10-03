@@ -1,3 +1,10 @@
+// DEPRECATED (TD-004): the Forge control plane lives in the TypeScript engine
+// (sdk/packages/forge/src/vault.ts ApiVault, secrets only in the OS credential store). The Flutter UI no longer uses this; it is a client of the engine
+// (lib/core/forge_engine). Nothing here is deleted yet because the standalone
+// Dart CLI/tests may still reference it; see CONTROL_PLANE.md "Migration to the
+// engine" for the removal plan and which parts have no engine equivalent.
+// ignore_for_file: deprecated_member_use_from_same_package
+
 import '../security/secrets_store.dart';
 
 /// One named credential slot for a provider, e.g. `nvidia`/`key1`. Multiple
@@ -38,6 +45,7 @@ class CredentialSlot {
 /// cooldown, or a human deliberately switching [setActiveSlot] to a genuinely
 /// separate account they are authorised to use — never an automatic
 /// same-cause-different-key retry loop.
+@Deprecated('Use the Forge engine (sdk/packages/forge/src/vault.ts ApiVault, secrets only in the OS credential store) through lib/core/forge_engine. See CONTROL_PLANE.md, Migration to the engine.')
 class CredentialVault {
   CredentialVault(this._secretsStore);
 

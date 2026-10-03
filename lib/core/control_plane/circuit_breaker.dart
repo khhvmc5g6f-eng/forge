@@ -1,3 +1,10 @@
+// DEPRECATED (TD-004): the Forge control plane lives in the TypeScript engine
+// (sdk/packages/forge/src/circuit.ts: three-level provider/key/model breakers). The Flutter UI no longer uses this; it is a client of the engine
+// (lib/core/forge_engine). Nothing here is deleted yet because the standalone
+// Dart CLI/tests may still reference it; see CONTROL_PLANE.md "Migration to the
+// engine" for the removal plan and which parts have no engine equivalent.
+// ignore_for_file: deprecated_member_use_from_same_package
+
 /// The five circuit states from the Control Plane spec. `degraded` and
 /// `recovering` are both "still usable, but treated with caution" states
 /// distinct from the fully-healthy `closed` and fully-unavailable `open`.
@@ -56,6 +63,7 @@ class CircuitBreakerConfig {
 /// `CLOSED -> DEGRADED -> OPEN -> (cooldown) -> HALF_OPEN -> RECOVERING -> CLOSED`,
 /// with any failure during `HALF_OPEN`/`RECOVERING` sending it straight back
 /// to `OPEN` rather than lingering in an ambiguous state.
+@Deprecated('Use the Forge engine (sdk/packages/forge/src/circuit.ts: three-level provider/key/model breakers) through lib/core/forge_engine. See CONTROL_PLANE.md, Migration to the engine.')
 class CircuitBreaker {
   CircuitBreaker(this.id, {CircuitBreakerConfig? config})
       : config = config ?? const CircuitBreakerConfig();

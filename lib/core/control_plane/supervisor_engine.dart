@@ -1,3 +1,8 @@
+// Uses the deprecated Dart CircuitBreaker/CapabilityRouter. SupervisorEngine and
+// TaskGraph themselves are NOT deprecated: the engine has no supervisor/worker
+// task-graph dispatch yet (directive 24-26), so this stays until it does.
+// ignore_for_file: deprecated_member_use_from_same_package
+
 import '../agents/agent_role.dart';
 import '../agents/agent_runtime.dart';
 import '../models/model_provider.dart';

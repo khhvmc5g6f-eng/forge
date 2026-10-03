@@ -1,3 +1,10 @@
+// DEPRECATED (TD-004): the Forge control plane lives in the TypeScript engine
+// (sdk/packages/forge/src/circuit.ts CircuitBoard). The Flutter UI no longer uses this; it is a client of the engine
+// (lib/core/forge_engine). Nothing here is deleted yet because the standalone
+// Dart CLI/tests may still reference it; see CONTROL_PLANE.md "Migration to the
+// engine" for the removal plan and which parts have no engine equivalent.
+// ignore_for_file: deprecated_member_use_from_same_package
+
 import 'circuit_breaker.dart';
 
 /// Central home for every [CircuitBreaker] in the system — one per provider,
@@ -8,6 +15,7 @@ import 'circuit_breaker.dart';
 /// `tool:<toolName>` for a tool) so it works uniformly for all of them —
 /// exactly the "for EVERY: PROVIDER, MODEL, ENDPOINT, DEPLOYMENT ... TOOL,
 /// MCP SERVER" requirement.
+@Deprecated('Use the Forge engine (sdk/packages/forge/src/circuit.ts CircuitBoard) through lib/core/forge_engine. See CONTROL_PLANE.md, Migration to the engine.')
 class CircuitBreakerRegistry {
   CircuitBreakerRegistry({CircuitBreakerConfig? defaultConfig})
       : _defaultConfig = defaultConfig ?? const CircuitBreakerConfig();

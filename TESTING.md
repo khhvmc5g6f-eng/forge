@@ -3,7 +3,7 @@
 ## Running
 
 ```bash
-flutter test                # all 123 tests
+flutter test                # whole suite (see counts in the engine-client report in docs/ENGINE_API.md)
 flutter test test/core/tools/policy_engine_test.dart   # a single file
 ```
 
@@ -22,6 +22,8 @@ documented in `NVIDIA.md`):
 | `test/core/tasks/task_manager_test.dart` | Step lifecycle, repair-loop and review-cycle budget termination (never infinite), `resumableTasks()` filtering, and — critically — **a task surviving a simulated application restart** via a fresh `TaskManager`/`FileTaskStore` reading the same directory |
 | `test/core/git/git_service_test.dart` | Git command construction and output parsing against a scripted `ProcessRunner`, checkpoint creation/rollback |
 | `test/core/review/reviewer_test.dart` | Verdict parsing (including fail-closed-to-rework on an unparsable response), the same-model-review refusal, and the bounded rework cycle terminating both on a pass and on exhausting `maxCycles` |
+| `test/forge_engine/*` | The Dart engine client against a **fake HTTP + SSE engine implemented in the test** (`fake_engine.dart`, real loopback sockets): SSE parsing, bearer token on every request, 401 handling (no retry storm), unreachable/5xx, reconnect with backoff, stale data flagged, event dedupe and resume (`last-event-id`), missed-event accounting, engine-restart detection, new-critical-alert detection, action wire format, refusal to send a secret over cleartext, token only in the secure store, live-flow reducer and engine graph (no event, no pulse) |
+| `test/ui/engine/*` | Widget tests for the Control Centre screens at phone/tablet/desktop sizes: dashboard answers, offline/no-data honesty, vault (masked, add/test/remove through confirmations, read-only engine disables everything, cleartext blocks keys), circuits tree + confirmed actions, usage provenance, alerts/guard, pairing, live-flow and Neural Lab network animate only while real events are fresh, shell navigation, alert-to-notification bridge |
 | `test/widget_test.dart` | The desktop shell renders every sidebar section, and switching sections swaps the visible panel — using Flutter's headless test binding (no real display server required) with a fake `GitService` process runner so no real subprocess is spawned mid-widget-test |
 | `test/core/context/repo_indexer_test.dart` | Dart/Python symbol and import extraction, ignored-directory skipping, ranked search, reverse-dependency lookup — against real temp-directory fixtures |
 | `test/core/memory/memory_store_test.dart` | Record/load/search/delete round-trip, and — like the Task Manager — a **second, independent** `MemoryStore` instance reading back what a first instance wrote |

@@ -1,3 +1,6 @@
+// Tests the deprecated Dart control plane (see CONTROL_PLANE.md, Migration to the engine).
+// ignore_for_file: deprecated_member_use_from_same_package, deprecated_member_use
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forge/core/control_plane/credential_vault.dart';
 import 'package:forge/core/security/secrets_store.dart';

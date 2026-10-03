@@ -57,7 +57,7 @@ verification against real external services:
   STOP semantics and Policy Engine gating; the macOS Accessibility driver itself is a
   documented stub (see `DEVELOPMENT.md`) since it needs a native platform channel this
   Linux container cannot build or run.
-- Multi-Provider Control Plane (`lib/core/control_plane/`, see `CONTROL_PLANE.md`) — a
+- Multi-Provider Control Plane: **now a client of the TypeScript engine** (`lib/core/forge_engine/`, `lib/ui/engine/`, `docs/ENGINE_API.md`); the earlier Dart implementation (`lib/core/control_plane/`, see `CONTROL_PLANE.md`, deprecated) — a
   genuine CLOSED/DEGRADED/OPEN/HALF_OPEN/RECOVERING circuit breaker per provider and per
   model, a capability-tier system (S/A/B/C/Local) with tier- and requirement-preserving
   failover, a multi-credential-per-provider vault, five additional live provider adapters

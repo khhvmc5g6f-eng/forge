@@ -37,3 +37,14 @@ The **Voice** tab talks to the Mac's voice gateway (engine repo: `sdk/packages/e
 - Voice never approves tool calls by itself; spoken approvals bind only to the live approval request on the Mac.
 
 Verified: 195 client tests pass (19 for voice); Android/macOS/iOS-simulator builds succeed; the Mac-side gateway round trip was verified with a scripted client. **Not verified: on a physical phone, with a person speaking, or on-device TTS/permissions dialogs.**
+
+## Control Centre on mobile/tablet/desktop (2026-10-03)
+The app now has a second tab, **Control Centre**, a client of the TypeScript engine's control plane (not a Dart copy):
+Dashboard (can it serve now / what is running / what needs attention / usage / routing / engine health), Provider Vault,
+Circuit Breakers (provider -> key -> model tree), Usage and capacity, Alerts + runaway guard, Live Flow, Network (Neural Lab)
+and Connection (pairing). Phones use a bottom bar, tablets and landscape phones (>= 700 dp) a rail; the desktop shell's
+**Control Centre** section is the same widget. Pairing is `forge://host:port?token=...` (paste or type), the token lives only
+in the Keychain/Keystore. Everything is read from `GET /forge/state` and `GET /forge/events`; **mutations need the proposed
+action API that the engine does not have yet**, so on today's engine the vault/circuit/alert controls are visibly disabled.
+Details, the exact wire contract and every gap: `docs/ENGINE_API.md`. Critical alerts raise local notifications while the app
+is connected (no push). Not verified: physical devices, a real engine over a real tunnel, notification permission prompts.
