@@ -41,6 +41,9 @@ List<AttentionItem> attentionItems(EngineState s) {
   for (final e in s.config.errors) {
     out.add(AttentionItem('warning', 'forge.yaml problem', e));
   }
+  for (final i in s.diagnostics.issues) {
+    out.add(AttentionItem(i.severity == 'critical' ? 'critical' : 'warning', 'Engine diagnostics: ${prettyState(i.kind)}', i.message));
+  }
   if (s.analytics.dropped > 0 || s.analytics.lastError != null) {
     out.add(AttentionItem('warning', 'Analytics store', s.analytics.lastError ?? '${s.analytics.dropped} record(s) dropped'));
   }
@@ -249,16 +252,17 @@ class _EngineHealth extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final d = state.diagnostics;
-    final nums = d.entries.where((e) => e.value is num).take(4).toList();
     final t = Theme.of(context).textTheme.bodySmall;
+    final statusColor = switch (d.status) { 'healthy' => const Color(0xFF2E9E5B), 'degraded' => const Color(0xFFE0A100), 'critical' => const Color(0xFFD64545), _ => const Color(0xFF7A7F87) };
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Wrap(spacing: 8, children: [StatusPill((d.status ?? 'no report').toUpperCase(), statusColor)]),
+      const SizedBox(height: 6),
       Text('Event stream: ${conn.eventsLive ? 'live' : 'not open'}', style: t),
       Text('Analytics store: ${fmtInt(state.analytics.written)} written, ${state.analytics.dropped} dropped', style: t),
       Text('forge.yaml: ${state.config.present ? (state.config.errors.isEmpty ? 'applied' : '${state.config.errors.length} error(s)') : 'not present'}', style: t),
-      if (nums.isNotEmpty) ...[
-        const SizedBox(height: 6),
-        for (final e in nums) Text('${e.key}: ${(e.value as num).toStringAsFixed((e.value is int) ? 0 : 1)}', style: t),
-      ],
+      if (d.eventLoopLagP99Ms != null) Text('Event loop lag p99: ${d.eventLoopLagP99Ms!.toStringAsFixed(0)} ms', style: t),
+      if (d.rssBytes != null) Text('Engine memory: ${(d.rssBytes! / 1048576).toStringAsFixed(0)} MB', style: t),
+      if (d.cpuPercent != null) Text('Engine CPU: ${d.cpuPercent!.toStringAsFixed(1)}%', style: t),
     ]);
   }
 }

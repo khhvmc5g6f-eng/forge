@@ -29,6 +29,8 @@ void main() {
       expect(find.textContaining('All time: 200 calls'), findsOneWidget);
       expect(find.textContaining('unpriced'), findsWidgets);
       expect(find.text('2 call(s) estimated'), findsOneWidget);
+      expect(find.text('HEALTHY'), findsOneWidget);
+      expect(find.text('Engine memory: 40 MB'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

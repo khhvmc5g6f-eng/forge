@@ -94,17 +94,19 @@ void main() {
 
   group('event stream', () {
     test('yields events, sends last-event-id, skips malformed frames', () async {
-      engine = await FakeEngine(token: 't').start();
+      engine = await FakeEngine(token: 'tok-123').start();
       final got = <String>[];
       var opened = false;
-      final sub = clientFor(engine, token: 't').events(afterSeq: 41, onOpen: () => opened = true).listen((e) => got.add('${e.seq}:${e.type}'));
+      final sub = clientFor(engine, token: 'tok-123')
+          .events(afterSeq: 41, onOpen: () => opened = true)
+          .listen((e) => got.add('${e.seq}:${e.type}'), onError: (_) {}); // the server closing at tearDown is an error here
       await until(() => opened && engine.sseClients == 1);
       expect(engine.sseHeaders.single['last-event-id'], '41');
       engine.emit('MODEL_REQUEST_STARTED', seq: 42, correlation: {'requestId': 'r1'});
       engine.emit('KEY_SELECTED', seq: 43, correlation: {'requestId': 'r1'});
       await until(() => got.length == 2);
       expect(got, ['42:MODEL_REQUEST_STARTED', '43:KEY_SELECTED']);
-      unawaited(sub.cancel()); // cancelling an open SSE response completes when the socket closes (tearDown)
+      unawaited(sub.cancel().catchError((_) {})); // cancelling an open SSE response completes when the socket closes (tearDown)
     });
 
     test('401 on the stream is unauthorized', () async {

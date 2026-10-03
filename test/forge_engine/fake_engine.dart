@@ -34,21 +34,17 @@ class FakeEngine {
   }
 
   Future<void> stop() async {
-    for (final r in List.of(_sse)) {
-      try {
-        await r.close();
-      } catch (_) {}
-    }
-    _sse.clear();
+    _closeStreams();
     await _server?.close(force: true);
   }
 
   /// Drops every open SSE connection (a network blip) while the server stays up.
-  Future<void> dropStreams() async {
+  Future<void> dropStreams() async => _closeStreams();
+
+  // Never awaited: closing a response whose client already went away can wait forever.
+  void _closeStreams() {
     for (final r in List.of(_sse)) {
-      try {
-        await r.close();
-      } catch (_) {}
+      r.close().then((_) {}, onError: (_) {});
     }
     _sse.clear();
   }
@@ -255,7 +251,17 @@ class FakeEngine {
           ],
         },
         'notifications': {'unread': notifications?.length ?? 0, 'recent': notifications ?? []},
-        'diagnostics': {'eventLoopLagMs': 3},
+        'diagnostics': {
+          'ts': 1,
+          'status': 'healthy',
+          'issues': [],
+          'metrics': {
+            'eventLoopLagMs': {'p50': 1, 'p99': 3, 'max': 4, 'samples': 10},
+            'memory': {'rssBytes': 41943040, 'heapUsedBytes': 4000000},
+            'cpuPercent': 0.4,
+            'inFlightRequests': 0,
+          },
+        },
         'analytics': {'queued': 0, 'dropped': 0, 'written': 200, 'corruptLines': 0, 'rawBytes': 1024},
         'availability': [
           {'providerId': 'openai', 'keyId': 'k1', 'keyName': 'work', 'modelId': 'gpt-x', 'status': 'available', 'checkedAt': 1, 'stale': false},

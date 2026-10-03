@@ -35,6 +35,9 @@ void main() {
     expect(s.unreadNotifications, 1);
     expect(s.availability.single.status, 'available');
     expect(s.analytics.written, 200);
+    expect(s.diagnostics.status, 'healthy');
+    expect(s.diagnostics.eventLoopLagP99Ms, 3);
+    expect(s.diagnostics.rssBytes, 41943040);
   });
 
   test('missing fields stay unknown instead of becoming numbers', () {

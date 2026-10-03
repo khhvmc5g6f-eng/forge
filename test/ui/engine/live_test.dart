@@ -106,17 +106,16 @@ void main() {
   });
 
   group('Console shell', () {
-    testWidgets('phone: bottom bar with More; tablet/desktop: rail with every page', (tester) async {
+    testWidgets('phone: chip bar reaches every page; tablet/desktop: rail with every page', (tester) async {
       await pumpWithSize(tester, const EngineConsole(), size: phone);
-      expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.byType(NavigationRail), findsNothing);
-      await tester.tap(find.text('More'));
-      await tester.pumpAndSettle();
-      final sheet = find.byType(BottomSheet);
-      for (final l in ['Usage', 'Live Flow', 'Network', 'Connection']) {
-        expect(find.descendant(of: sheet, matching: find.text(l)), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing, reason: 'the app shell owns the bottom bar');
+      for (final l in ['Dashboard', 'Vault', 'Circuits', 'Usage', 'Alerts', 'Live Flow', 'Network', 'Connection']) {
+        await tester.ensureVisible(find.widgetWithText(ChoiceChip, l));
       }
-      await tester.tap(find.descendant(of: sheet, matching: find.text('Usage')));
+      await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Usage'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Usage'));
       await tester.pumpAndSettle();
       expect(find.text('Last 15 minutes'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -143,7 +142,7 @@ void main() {
     testWidgets('unread alerts show a badge on Alerts', (tester) async {
       final conn = StubConnection(stateJson: FakeEngine.baseState(notifications: [FakeEngine.alert('a', 'critical'), FakeEngine.alert('b', 'warning')]));
       await pumpWithSize(tester, const EngineConsole(), conn: conn, size: phone);
-      expect(find.text('2'), findsOneWidget);
+      expect(find.text('Alerts (2)'), findsOneWidget);
     });
   });
 

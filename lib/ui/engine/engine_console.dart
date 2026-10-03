@@ -32,11 +32,9 @@ final engineConsolePageProvider = StateProvider<EnginePage>((ref) => EnginePage.
 
 /// The Forge Control Centre: dashboard, vault, circuits, usage, alerts, live
 /// flow, network and connection, all backed by the engine client. Responsive:
-/// rail on tablets and desktops, bottom bar on phones.
+/// rail on tablets and desktops, a scrollable chip bar on phones.
 class EngineConsole extends ConsumerWidget {
   const EngineConsole({super.key});
-
-  static const _phonePrimary = [EnginePage.dashboard, EnginePage.vault, EnginePage.circuits, EnginePage.alerts];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -70,24 +68,31 @@ class EngineConsole extends ConsumerWidget {
           Expanded(child: content),
         ]);
       }
-      final primaryIndex = _phonePrimary.indexOf(page);
-      return Scaffold(
-        body: content,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: primaryIndex >= 0 ? primaryIndex : _phonePrimary.length,
-          onDestinationSelected: (i) {
-            if (i < _phonePrimary.length) {
-              go(_phonePrimary[i]);
-            } else {
-              _more(context, go, page);
-            }
-          },
-          destinations: [
-            for (final p in _phonePrimary) NavigationDestination(icon: icon(p), label: p.label),
-            NavigationDestination(icon: Icon(primaryIndex >= 0 ? Icons.more_horiz : page.icon), label: primaryIndex >= 0 ? 'More' : page.label),
-          ],
+      // Narrow screens: a scrollable chip bar at the top, so the app's own bottom bar
+      // (Engine chat / Control Centre) stays the only bottom navigation.
+      return Column(children: [
+        ConnectionBanner(connection: conn, onFix: () => go(EnginePage.connection)),
+        SizedBox(
+          height: 52,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(children: [
+              for (final p in EnginePage.values)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    avatar: p == EnginePage.alerts && unread > 0 ? null : Icon(p.icon, size: 16),
+                    label: Text(p == EnginePage.alerts && unread > 0 ? '${p.label} ($unread)' : p.label),
+                    selected: p == page,
+                    onSelected: (_) => go(p),
+                  ),
+                ),
+            ]),
+          ),
         ),
-      );
+        Expanded(child: _body(page, go)),
+      ]);
     });
   }
 
@@ -101,25 +106,4 @@ class EngineConsole extends ConsumerWidget {
         EnginePage.network => const NetworkPage(),
         EnginePage.connection => const ConnectPage(),
       };
-
-  void _more(BuildContext context, void Function(EnginePage) go, EnginePage current) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (final p in EnginePage.values.where((p) => !_phonePrimary.contains(p)))
-            ListTile(
-              leading: Icon(p.icon),
-              title: Text(p.label),
-              selected: p == current,
-              onTap: () {
-                Navigator.pop(ctx);
-                go(p);
-              },
-            ),
-        ]),
-      ),
-    );
-  }
 }

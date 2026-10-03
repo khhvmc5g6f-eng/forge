@@ -474,6 +474,38 @@ class EngineAvailability {
   final String? detail;
 }
 
+class EngineDiagnosticIssue {
+  const EngineDiagnosticIssue({required this.kind, required this.severity, required this.message, this.subject});
+  factory EngineDiagnosticIssue.fromJson(Map<String, dynamic> j) =>
+      EngineDiagnosticIssue(kind: jStr(j['kind']) ?? '?', severity: jStr(j['severity']) ?? 'warning', message: jStr(j['message']) ?? '', subject: jStr(j['subject']));
+  final String kind, severity, message;
+  final String? subject;
+}
+
+/// `SelfDiagnostics.report()` (diagnostics.ts). Every metric is nullable: the
+/// engine omits what it has not measured.
+class EngineDiagnostics {
+  const EngineDiagnostics({this.status, this.issues = const [], this.eventLoopLagP99Ms, this.rssBytes, this.cpuPercent, this.inFlightRequests});
+  factory EngineDiagnostics.fromJson(Object? v) {
+    final j = jMap(v);
+    final m = jMap(j['metrics']);
+    return EngineDiagnostics(
+      status: jStr(j['status']),
+      issues: jList(j['issues'], EngineDiagnosticIssue.fromJson),
+      eventLoopLagP99Ms: jNum(jMap(m['eventLoopLagMs'])['p99']),
+      rssBytes: jNum(jMap(m['memory'])['rssBytes']),
+      cpuPercent: jNum(m['cpuPercent']),
+      inFlightRequests: jInt(m['inFlightRequests']),
+    );
+  }
+
+  /// healthy | degraded | critical, or null when the engine sent no report.
+  final String? status;
+  final List<EngineDiagnosticIssue> issues;
+  final double? eventLoopLagP99Ms, rssBytes, cpuPercent;
+  final int? inFlightRequests;
+}
+
 class EngineAnalyticsStats {
   const EngineAnalyticsStats({this.queued = 0, this.dropped = 0, this.written = 0, this.corruptLines = 0, this.rawBytes = 0, this.lastError});
   factory EngineAnalyticsStats.fromJson(Object? v) {
@@ -524,7 +556,7 @@ class EngineState {
     this.routing = const EngineRouting(),
     this.unreadNotifications = 0,
     this.notifications = const [],
-    this.diagnostics = const {},
+    this.diagnostics = const EngineDiagnostics(),
     this.analytics = const EngineAnalyticsStats(),
     this.availability = const [],
     this.config = const EngineConfigStatus(),
@@ -545,7 +577,7 @@ class EngineState {
       routing: EngineRouting.fromJson(j['routing']),
       unreadNotifications: jInt(n['unread']) ?? 0,
       notifications: jList(n['recent'], EngineNotification.fromJson),
-      diagnostics: jMap(j['diagnostics']),
+      diagnostics: EngineDiagnostics.fromJson(j['diagnostics']),
       analytics: EngineAnalyticsStats.fromJson(j['analytics']),
       availability: jList(j['availability'], EngineAvailability.fromJson),
       config: EngineConfigStatus.fromJson(j['config']),
@@ -569,8 +601,7 @@ class EngineState {
   final int unreadNotifications;
   final List<EngineNotification> notifications;
 
-  /// Raw `SelfDiagnostics.report()`; its shape is owned by the engine.
-  final Map<String, dynamic> diagnostics;
+  final EngineDiagnostics diagnostics;
   final EngineAnalyticsStats analytics;
   final List<EngineAvailability> availability;
   final EngineConfigStatus config;
