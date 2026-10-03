@@ -4,15 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/cline_hub/hub_root.dart';
 import '../panels/agents_panel.dart';
 import '../panels/browser_panel.dart';
-import '../panels/control_centre_panel.dart';
+import '../engine/engine_console.dart';
 import '../panels/devices_panel.dart';
 import '../panels/diagnostics_panel.dart';
-import '../panels/gateway_panel.dart';
 import '../panels/git_panel.dart';
 import '../panels/mcp_panel.dart';
 import '../panels/memory_panel.dart';
 import '../panels/models_panel.dart';
-import '../panels/neural_lab/neural_lab_panel.dart';
+import '../panels/neural_lab/forge_neural_lab.dart';
 import '../panels/projects_panel.dart';
 import '../panels/settings_panel.dart';
 import '../panels/tasks_panel.dart';
@@ -68,7 +67,7 @@ class ForgeShell extends ConsumerWidget {
                   ),
                 ),
                 Expanded(child: _bodyFor(section)),
-                if (section != SidebarSection.terminal) ...[
+                if (_showsBottomTerminal(section)) ...[
                   const Divider(height: 1),
                   const SizedBox(
                     height: 220,
@@ -82,6 +81,11 @@ class ForgeShell extends ConsumerWidget {
       ),
     );
   }
+
+  /// The bottom Terminal panel is hidden on the Terminal section itself and on
+  /// the data-dense Control Centre / Neural Lab, which need the full height.
+  static bool _showsBottomTerminal(SidebarSection s) =>
+      s != SidebarSection.terminal && s != SidebarSection.controlCentre && s != SidebarSection.neuralLab;
 
   Widget _bodyFor(SidebarSection section) {
     switch (section) {
@@ -106,9 +110,7 @@ class ForgeShell extends ConsumerWidget {
       case SidebarSection.models:
         return const ModelsPanel();
       case SidebarSection.controlCentre:
-        return const ControlCentrePanel();
-      case SidebarSection.gateway:
-        return const GatewayPanel();
+        return const EngineConsole();
       case SidebarSection.memory:
         return const MemoryPanel();
       case SidebarSection.neuralLab:

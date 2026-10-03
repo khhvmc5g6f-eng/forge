@@ -29,7 +29,7 @@ List<Override> _testOverrides() => [
 
 void main() {
   testWidgets('ForgeShell renders every sidebar section and defaults to Tasks', (tester) async {
-    await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp(forceMobile: false)));
+    await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp(forceMobile: false, autoRestoreEngine: false)));
     await tester.pumpAndSettle();
 
     for (final section in SidebarSection.values) {
@@ -39,7 +39,7 @@ void main() {
   });
 
   testWidgets('selecting a sidebar destination switches the visible panel', (tester) async {
-    await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp(forceMobile: false)));
+    await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp(forceMobile: false, autoRestoreEngine: false)));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Git'));
@@ -49,11 +49,14 @@ void main() {
   });
 
   testWidgets('phones start on the hub connect screen, not the desktop shell', (tester) async {
-    await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp(forceMobile: true)));
+    await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp(forceMobile: true, autoRestoreEngine: false)));
     await tester.pumpAndSettle();
 
     expect(find.text('Connect to Forge'), findsOneWidget);
     expect(find.text('Hub address'), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
+    // The Control Centre is one tap away on the bottom bar.
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('Control Centre'), findsOneWidget);
   });
 }

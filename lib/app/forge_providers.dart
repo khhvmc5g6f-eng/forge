@@ -6,10 +6,6 @@ import '../core/computer/computer_control_session.dart';
 import '../core/computer/computer_control_driver.dart';
 import '../core/context/repo_index.dart';
 import '../core/context/repo_indexer.dart';
-import '../core/control_plane/capability_router.dart';
-import '../core/control_plane/circuit_breaker_registry.dart';
-import '../core/control_plane/credential_vault.dart';
-import '../core/control_plane/model_tier.dart';
 import '../core/devices/device_manager.dart';
 import '../core/git/checkpoint.dart';
 import '../core/git/git_service.dart';
@@ -97,39 +93,16 @@ final allModelProvidersProvider = Provider<Map<String, ModelProvider>>((ref) {
   };
 });
 
-/// Multi-credential-per-provider storage (`NVIDIA_KEY_1`/`NVIDIA_KEY_2`
-/// style deployments) on top of the same [SecretsStore] every provider
-/// adapter already uses — see `CredentialVault`'s class doc for the "never
-/// use rotation to evade a rate limit" boundary this enforces.
-final credentialVaultProvider = Provider<CredentialVault>((ref) {
-  return CredentialVault(ref.watch(secretsStoreProvider));
-});
-
-/// One circuit per provider (`nvidia-nim`) and one per (provider, model)
-/// (`nvidia-nim::kimi-k3`), shared by the plain [ModelRouter] below and by
-/// [CapabilityRouter]/`SupervisorEngine` for the tiered Task Graph path.
-final circuitBreakerRegistryProvider = Provider<CircuitBreakerRegistry>((ref) => CircuitBreakerRegistry());
-
-final tierRegistryProvider = Provider<TierRegistry>((ref) => TierRegistry());
-
-/// The Control Plane's capability-and-health-aware router, sitting above
-/// the plain [ModelRouter] per `ARCHITECTURE.md`'s layering — used by
-/// `SupervisorEngine` for tiered Task Graph dispatch.
-final capabilityRouterProvider = Provider<CapabilityRouter>((ref) {
-  return CapabilityRouter(
-    modelRegistry: ref.watch(modelRegistryProvider),
-    tierRegistry: ref.watch(tierRegistryProvider),
-    circuitBreakers: ref.watch(circuitBreakerRegistryProvider),
-    policy: ref.watch(routingPolicyProvider),
-  );
-});
+// Control plane (circuit breakers, multi-key vault, capability routing, usage,
+// alerts) now lives in the TypeScript Forge engine; the UI reads and drives it
+// through `engineConnectionProvider` (lib/core/forge_engine). The previous Dart
+// copies (lib/core/control_plane/*) are deprecated; see docs/ENGINE_API.md and
+// CONTROL_PLANE.md for the migration note and what has no engine equivalent yet.
 
 final modelRouterProvider = Provider<ModelRouter>((ref) {
-  final circuitBreakers = ref.watch(circuitBreakerRegistryProvider);
   return ModelRouter(
     registry: ref.watch(modelRegistryProvider),
     policy: ref.watch(routingPolicyProvider),
-    isCircuitAvailable: (id) => circuitBreakers.breakerFor(id).isAvailable,
   );
 });
 

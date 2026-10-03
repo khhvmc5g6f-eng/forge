@@ -1,17 +1,22 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'core/cline_hub/hub_root.dart';
+import 'ui/engine/alert_bridge.dart';
 import 'ui/shell/forge_shell.dart';
+import 'ui/shell/mobile_home.dart';
 
 /// Root widget. Named `MyApp` for compatibility with the default Flutter
 /// project template's smoke test convention; kept intentionally thin.
 ///
-/// Phones (iOS/Android) get the remote-control workspace that drives the
-/// Cline-Enhanced engine running on your Mac. Desktop keeps the full Forge
-/// workstation shell, which also has a "Forge Engine" section using the same client.
+/// Phones and tablets (iOS/Android) get the engine remote: the chat workspace
+/// that drives the Cline-Enhanced engine on your Mac plus the Control Centre
+/// (vault, circuits, usage, alerts, live flow). Desktop keeps the full Forge
+/// workstation shell, whose "Control Centre" section is the same engine client.
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, this.forceMobile});
+  const MyApp({super.key, this.forceMobile, this.autoRestoreEngine = true});
+
+  /// Reconnect to the saved Forge engine on launch. Tests turn this off.
+  final bool autoRestoreEngine;
 
   /// Test/preview override; null = decide by platform.
   final bool? forceMobile;
@@ -32,9 +37,8 @@ class MyApp extends StatelessWidget {
         brightness: Brightness.dark,
         useMaterial3: true,
       ),
-      home: mobile
-          ? const Scaffold(body: SafeArea(child: HubRoot()))
-          : const ForgeShell(),
+      builder: (context, child) => EngineAlertBridge(autoRestore: autoRestoreEngine, child: child ?? const SizedBox.shrink()),
+      home: mobile ? const MobileHome() : const ForgeShell(),
     );
   }
 }

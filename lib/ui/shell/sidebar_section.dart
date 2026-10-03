@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// The left-sidebar sections from the brief, plus `controlCentre` added by
-/// the Multi-Provider Control Plane extension. Order here is the display
+/// The left-sidebar sections from the brief, plus `controlCentre`: the
+/// engine-backed Control Centre (dashboard, vault, circuits, usage, alerts,
+/// live flow, network). Order here is the display
 /// order in the [NavigationRail].
 enum SidebarSection {
   projects(Icons.folder_outlined, 'Projects'),
@@ -15,7 +16,6 @@ enum SidebarSection {
   terminal(Icons.terminal_outlined, 'Terminal'),
   models(Icons.memory_outlined, 'Models'),
   controlCentre(Icons.hub, 'Control Centre'),
-  gateway(Icons.alt_route_outlined, 'Gateway'),
   memory(Icons.psychology_outlined, 'Memory'),
   neuralLab(Icons.science_outlined, 'Neural Lab'),
   diagnostics(Icons.monitor_heart_outlined, 'Diagnostics'),

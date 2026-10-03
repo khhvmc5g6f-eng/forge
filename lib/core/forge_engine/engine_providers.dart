@@ -7,6 +7,7 @@ import '../security/secrets_store.dart';
 import 'alert_notifier.dart';
 import 'engine_connection.dart';
 import 'engine_credentials.dart';
+import 'engine_live.dart';
 
 /// Secure storage for the engine bearer token. Real platform secure storage
 /// (Keychain / Keystore) on macOS, iOS and Android; in-memory in tests.
@@ -23,9 +24,8 @@ final engineCredentialsProvider =
 
 /// The one link to the Forge engine, shared by every screen.
 final engineConnectionProvider = ChangeNotifierProvider<EngineConnection>((ref) {
-  final c = EngineConnection(credentials: ref.watch(engineCredentialsProvider));
-  ref.onDispose(c.dispose);
-  return c;
+  // ChangeNotifierProvider disposes the notifier itself.
+  return EngineConnection(credentials: ref.watch(engineCredentialsProvider));
 });
 
 final alertNotifierProvider = Provider<AlertNotifier>((ref) {
@@ -35,3 +35,8 @@ final alertNotifierProvider = Provider<AlertNotifier>((ref) {
 
 /// Whether critical engine alerts raise OS notifications (default on).
 final criticalNotificationsEnabledProvider = StateProvider<bool>((ref) => true);
+
+/// Live view models (Live Flow, Neural Lab network) fed by real engine events.
+final engineLiveProvider = ChangeNotifierProvider<EngineLive>((ref) {
+  return EngineLive(ref.read(engineConnectionProvider));
+});

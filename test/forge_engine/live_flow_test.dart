@@ -13,7 +13,7 @@ EngineEvent ev(String type, {String? rid, Map<String, dynamic> data = const {}, 
       seq: ++_seq,
       ts: at ?? t0,
       type: type,
-      correlation: {if (rid != null) 'requestId': rid, ...corr},
+      correlation: {'requestId': ?rid, ...corr},
       target: target,
       data: data,
     );

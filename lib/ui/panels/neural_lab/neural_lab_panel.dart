@@ -7,6 +7,12 @@ import 'package:flutter/scheduler.dart';
 import '../../../core/neural/mlp_engine.dart';
 import 'neural_3d_painter.dart';
 
+/// LOCAL MLP EXPERIMENT (a mode of the Neural Lab). Not Forge engine data: it
+/// trains a small network on a *generated* dataset on this device, so every
+/// pulse here is the experiment's own maths, never agent, model or provider
+/// activity. The Neural Lab labels it as such; the live engine network is
+/// `EngineNetworkView` (lib/ui/engine/network_view.dart).
+///
 /// FORGE · NEURAL LAB — a native, live 3D visualisation of a neural network
 /// actually learning: forward-pass data flow, backward-pass gradient flow
 /// (real per-edge ∂L/∂w), and a full live analytics dock. Ported from the
@@ -14,14 +20,14 @@ import 'neural_3d_painter.dart';
 /// The engine (`lib/core/neural/mlp_engine.dart`) is pure Dart and
 /// gradient-check tested; this panel is pure Flutter — no web views, no 3D
 /// packages, no plugins.
-class NeuralLabPanel extends StatefulWidget {
-  const NeuralLabPanel({super.key});
+class MlpExperimentPanel extends StatefulWidget {
+  const MlpExperimentPanel({super.key});
 
   @override
-  State<NeuralLabPanel> createState() => _NeuralLabPanelState();
+  State<MlpExperimentPanel> createState() => _NeuralLabPanelState();
 }
 
-class _NeuralLabPanelState extends State<NeuralLabPanel>
+class _NeuralLabPanelState extends State<MlpExperimentPanel>
     with SingleTickerProviderStateMixin {
   // ---- experiment config ----
   String _datasetName = 'spiral';
@@ -392,6 +398,16 @@ class _NeuralLabPanelState extends State<NeuralLabPanel>
     );
     return Column(
       children: [
+        Container(
+          width: double.infinity,
+          color: Theme.of(context).colorScheme.tertiaryContainer,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Text(
+            'LOCAL EXPERIMENT: trains a small network on a generated dataset on this device. '
+            'This is not Forge engine activity; the "Forge network" mode shows real engine events.',
+            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onTertiaryContainer),
+          ),
+        ),
         _buildToolbar(context),
         Expanded(
           child: wide

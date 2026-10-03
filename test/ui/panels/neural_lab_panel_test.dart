@@ -12,13 +12,13 @@ void main() {
     tester.view.physicalSize = const Size(900, 1500);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: NeuralLabPanel())));
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: MlpExperimentPanel())));
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 16));
     }
   }
 
-  testWidgets('Neural Lab panel renders 3D stage, controls and analytics dock',
+  testWidgets('MLP experiment panel renders 3D stage, controls and analytics dock',
       (tester) async {
     await pumpPanel(tester);
 
@@ -34,6 +34,12 @@ void main() {
     expect(find.text('CONFUSION MATRIX'), findsOneWidget);
     // initial phase (embedded in the accuracy readout, e.g. "0.0% · idle")
     expect(find.textContaining('idle'), findsWidgets);
+  });
+
+  testWidgets('the experiment says it is not Forge engine data', (tester) async {
+    await pumpPanel(tester);
+    expect(find.textContaining('LOCAL EXPERIMENT'), findsOneWidget);
+    expect(find.textContaining('not Forge engine activity'), findsOneWidget);
   });
 
   testWidgets('pressing Train runs steps and updates metrics without throwing',

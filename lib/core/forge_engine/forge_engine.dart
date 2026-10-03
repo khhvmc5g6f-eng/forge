@@ -9,6 +9,7 @@ export 'engine_connection.dart';
 export 'engine_credentials.dart';
 export 'engine_endpoint.dart';
 export 'engine_graph.dart';
+export 'engine_live.dart';
 export 'engine_models.dart';
 export 'engine_providers.dart';
 export 'live_flow.dart';
