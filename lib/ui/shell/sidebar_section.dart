@@ -15,6 +15,7 @@ enum SidebarSection {
   terminal(Icons.terminal_outlined, 'Terminal'),
   models(Icons.memory_outlined, 'Models'),
   controlCentre(Icons.hub, 'Control Centre'),
+  gateway(Icons.alt_route_outlined, 'Gateway'),
   memory(Icons.psychology_outlined, 'Memory'),
   neuralLab(Icons.science_outlined, 'Neural Lab'),
   diagnostics(Icons.monitor_heart_outlined, 'Diagnostics'),
