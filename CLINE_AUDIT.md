@@ -1,3 +1,10 @@
+> **CORRECTION (2026-10-03).** This audit was written against marketing copy and is superseded by
+> `Forge/FORGE_PROGRAM/01-cline-capability-register.md` (code-verified, upstream 39ff2359f). Wrong claims below:
+> multi-agent is *not* marketing-only (team runtime, spawn_agent, subagents, run recovery exist);
+> checkpoints are refs in the user's own repo, *not* a shadow git; Cline has 228 providers, not six;
+> there is no keychain/keytar credential store; MCP is client-only (tools only); there is no git or browser tool.
+> Still correct: no provider failover/circuit breaker, user-directed model switching, Apache-2.0.
+
 # Cline Audit (Control Plane Extension)
 
 Performed live against the current `cline/cline` GitHub repository before building the
