@@ -49,6 +49,9 @@ void main() {
   });
 
   testWidgets('phones start on the hub connect screen, not the desktop shell', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(ProviderScope(overrides: _testOverrides(), child: const MyApp(forceMobile: true, autoRestoreEngine: false)));
     await tester.pumpAndSettle();
 

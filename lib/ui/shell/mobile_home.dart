@@ -18,7 +18,7 @@ final mobileTabProvider = StateProvider<MobileTab>((ref) => MobileTab.chat);
 
 /// iPhone / iPad / Android shell: the Cline-engine chat workspace and the
 /// engine-backed Control Centre, both clients of the TypeScript engine.
-/// Phones get a bottom bar, tablets (>= 840 dp) a rail. Both tabs stay mounted
+/// Phones get a bottom bar, tablets and landscape phones (>= 700 dp) a rail. Both tabs stay mounted
 /// so switching never drops a chat or a connection.
 class MobileHome extends ConsumerWidget {
   const MobileHome({super.key});
@@ -29,7 +29,7 @@ class MobileHome extends ConsumerWidget {
     void go(MobileTab t) => ref.read(mobileTabProvider.notifier).state = t;
     final body = IndexedStack(index: tab.index, children: const [HubRoot(), EngineConsole()]);
     return LayoutBuilder(builder: (context, c) {
-      if (c.maxWidth >= 840) {
+      if (c.maxWidth >= 700) {
         return Scaffold(
           body: SafeArea(
             child: Row(children: [

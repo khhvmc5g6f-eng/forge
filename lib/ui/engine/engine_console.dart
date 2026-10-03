@@ -57,7 +57,7 @@ class EngineConsole extends ConsumerWidget {
     ]);
 
     return LayoutBuilder(builder: (context, c) {
-      if (c.maxWidth >= 840) {
+      if (c.maxWidth >= 700) {
         return Row(children: [
           NavigationRail(
             selectedIndex: page.index,

@@ -36,7 +36,10 @@ final alertNotifierProvider = Provider<AlertNotifier>((ref) {
 /// Whether critical engine alerts raise OS notifications (default on).
 final criticalNotificationsEnabledProvider = StateProvider<bool>((ref) => true);
 
+/// Wall clock used by the live views; tests substitute a controllable one.
+final engineClockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
 /// Live view models (Live Flow, Neural Lab network) fed by real engine events.
 final engineLiveProvider = ChangeNotifierProvider<EngineLive>((ref) {
-  return EngineLive(ref.read(engineConnectionProvider));
+  return EngineLive(ref.read(engineConnectionProvider), clock: ref.read(engineClockProvider));
 });

@@ -31,14 +31,20 @@ class EngineNetworkView extends ConsumerStatefulWidget {
 }
 
 class _EngineNetworkViewState extends ConsumerState<EngineNetworkView> with SingleTickerProviderStateMixin {
-  late final Ticker _ticker = createTicker((_) {
-    final live = ref.read(engineLiveProvider);
-    if (live.graph.activeEdges(live.now).isEmpty) {
-      _ticker.stop();
-    }
-    if (mounted) setState(() {});
-  });
+  late final Ticker _ticker;
   String? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker((_) {
+      final live = ref.read(engineLiveProvider);
+      if (live.graph.activeEdges(live.now).isEmpty) {
+        _ticker.stop();
+      }
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   void dispose() {

@@ -380,6 +380,35 @@ class EngineConnection extends ChangeNotifier {
     return r;
   }
 
+  // ---- test hooks (widget tests drive the UI without a network) ----
+
+  /// Sets observable state directly, as if a poll had just succeeded.
+  @visibleForTesting
+  void debugApply({EngineState? state, EngineLinkStatus? status, EngineEndpoint? endpoint, EngineCapabilities? capabilities, bool? eventsLive, String? error}) {
+    if (endpoint != null) this.endpoint = endpoint;
+    if (state != null) {
+      _applyState(state);
+      this.state = state;
+    }
+    if (status != null) this.status = status;
+    if (capabilities != null) {
+      this.capabilities = capabilities;
+      capabilitiesKnown = true;
+    }
+    if (eventsLive != null) this.eventsLive = eventsLive;
+    if (error != null) this.error = error;
+    _notify();
+  }
+
+  /// Delivers an event as if it had arrived on the SSE stream.
+  @visibleForTesting
+  void debugEmit(EngineEvent e) {
+    _lastSeq = e.seq;
+    events.add(e);
+    if (!_eventCtl.isClosed) _eventCtl.add(e);
+    _notify();
+  }
+
   @override
   void dispose() {
     _disposed = true;
