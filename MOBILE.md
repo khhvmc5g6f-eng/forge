@@ -40,11 +40,13 @@ Verified: 195 client tests pass (19 for voice); Android/macOS/iOS-simulator buil
 
 ## Control Centre on mobile/tablet/desktop (2026-10-03)
 The app now has a second tab, **Control Centre**, a client of the TypeScript engine's control plane (not a Dart copy):
-Dashboard (can it serve now / what is running / what needs attention / usage / routing / engine health), Provider Vault,
-Circuit Breakers (provider -> key -> model tree), Usage and capacity, Alerts + runaway guard, Live Flow, Network (Neural Lab)
-and Connection (pairing). Phones use a bottom bar, tablets and landscape phones (>= 700 dp) a rail; the desktop shell's
+Dashboard (can it serve now / what is running / what needs attention / usage / routing / engine health),
+Circuit Breakers (provider -> key -> model tree), Usage and capacity, Alerts + runaway guard, Live Flow, Network (Neural Lab):
+operational only. A third tab, **Settings & Connections**, holds the engine connection (pairing), the Provider credentials
+(engine vault) and notification preferences; the Control Centre deep-links to it. Phones use a bottom bar, tablets and landscape phones (>= 700 dp) a rail; the desktop shell's
 **Control Centre** section is the same widget. Pairing is `forge://host:port?token=...` (paste or type), the token lives only
-in the Keychain/Keystore. Everything is read from `GET /forge/state` and `GET /forge/events`; **mutations need the proposed
-action API that the engine does not have yet**, so on today's engine the vault/circuit/alert controls are visibly disabled.
+in the Keychain/Keystore. Everything is read from `GET /forge/state` and `GET /forge/events`; key and circuit actions use the
+engine's token-gated `/forge/api/*` management API when the engine mounts it (it is loopback-only, so a phone needs an
+engine-side change or tunnel before it can use it); otherwise the controls are visibly disabled with the reason.
 Details, the exact wire contract and every gap: `docs/ENGINE_API.md`. Critical alerts raise local notifications while the app
 is connected (no push). Not verified: physical devices, a real engine over a real tunnel, notification permission prompts.

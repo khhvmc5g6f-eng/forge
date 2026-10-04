@@ -63,6 +63,12 @@ desktop shell selects it automatically on macOS outside of tests. `InMemorySecre
 is used in the unit-test environment and on hosts without secure storage, and must never
 hold a real production credential.
 
+**Provider credentials live only in the engine vault** (Settings & Connections > Provider credentials, which calls the
+engine's token-gated `/forge/api/keys`). The app has no provider-key input of its own. Keys that an earlier build stored in
+`SecretsStore` (service `app.forge.secrets`) stay readable, are flagged "legacy — move to engine", receive no new writes,
+and are deleted only after the engine confirmed it stored them (user-confirmed; see `docs/ENGINE_API.md` section 4a).
+The only other secret this app stores is the engine bearer token.
+
 Additionally, terminal commands execute on macOS under a Seatbelt (`sandbox-exec`)
 profile that denies file writes outside the project root (and permits /tmp), so even a
 command the rule-based classifier mis-judges cannot scribble outside the project. The

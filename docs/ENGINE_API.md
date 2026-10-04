@@ -24,18 +24,15 @@ Client code: `lib/core/forge_engine/` (`engine_client.dart`, `engine_connection.
   (`flutter_secure_storage`: Keychain on macOS/iOS, Keystore-backed on Android). If the secure store refuses the write the token is
   kept in memory for the session and the UI says so.
 
-## 2. Authentication (PENDING in the engine)
+## 2. Authentication
 
-The client sends `Authorization: Bearer <token>` on **every** request (state, events, actions) whenever a token is set.
-The gateway does not check it yet (another agent is adding it). Expected contract, which the client already handles:
+The client sends `Authorization: Bearer <token>` on **every** request (state, events, actions) whenever a token is set. The
+token is the engine's per-install gateway token (`cp.auth`, `gateway-auth.ts`).
 
-| Case | Engine answer | Client behaviour |
+| Surface | Engine behaviour | Client behaviour |
 |---|---|---|
-| missing / wrong / expired token | `401` (or `403`) | status `unauthorized`, **no retry loop**, message "re-pair with a valid token"; token never appears in error text |
-| engine without auth | `200` | works without a token (local dev) |
-
-Until auth ships, anything that can reach the port can read `/forge/state`. Do not expose the port without a proxy that
-enforces the token.
+| `/forge/state`, `/forge/events`, `/forge/health`, `/v1/*` | loopback callers need no token; any other client must present it | status `unauthorized` on 401/403, **no retry loop**, message "re-pair with a valid token"; token never appears in error text |
+| `/forge/api/*` (management API) | **always** needs the token, even on loopback; loopback peers only; 401 otherwise; 404 when the engine was not started with `management` | actions are disabled with the reason ("needs the bearer token" / "rejected the token" / "read-only engine") |
 
 ## 3. Read API that exists today
 
@@ -59,43 +56,54 @@ Facts the client relies on (verified in `gateway.ts`/`dashboard.ts`/`events.ts`)
   `FAILOVER{from,toKey,kind,status}`, `CIRCUIT_STATE_CHANGED{level,id,to}`, `TOOL_STARTED|COMPLETE|FAILED{tool}` with
   correlation `requestId, agentId, sessionId, taskId, toolCallId`.
 
-## 4. Action API: PROPOSED (does not exist in the engine yet)
+## 4. Action API: the engine's management API (`/forge/api/*`)
 
-The engine has **no mutation endpoints over HTTP**. Vault, circuit and alert operations exist only as in-process calls
-(`cp.vault.*`, `cp.board.*`, `cp.alerts.*`, `cp.guard.*`) and as Tauri sidecar commands in
-`apps/examples/desktop-app/sidecar/forge-*-commands.ts` (`forge_vault_add_key`, `forge_circuit_action`, `forge_cc_ack`,
-`forge_cc_guard_resume`, ...). So a remote client cannot manage anything until the gateway exposes them.
+Implemented in the engine by `control-api.ts` / `control-ops.ts`; enabled only when the host starts the control plane with
+`createControlPlane({ management: {} })`. The Dart client (`EngineClient`) uses exactly these routes:
 
-The client is written against the following contract, discovered at runtime so a read-only engine degrades cleanly:
-
-```
-GET /forge/api/v1/capabilities
-  -> 200 { "version": "1", "actions": ["key.add","key.test","key.update","key.remove","circuit.action","alert.ack","guard.resume"] }
-  -> 404 = read-only engine (the app disables every mutation and says "This engine is read-only")
-```
-
-All action routes need the bearer token, accept/return JSON, answer `{ "ok": boolean, "message": string, ... }`, return
-`4xx { "error": { "message" } }` for refusals and must **never echo a secret**.
-
-| Action id | Route | Body | Maps to |
+| Action id (UI gate) | Route | Body | Response |
 |---|---|---|---|
-| `key.add` | `POST /forge/api/v1/vault/keys` | `{providerId, name, secret, priority?}` | `forge_vault_add_key` / `vault.addKey` (secret goes straight to the OS credential store; response has the masked view only) |
-| `key.test` | `POST /forge/api/v1/vault/keys/{keyId}/test` | `{}` | `forge_vault_test_key` (real provider call; flagged `test: true`) |
-| `key.update` | `PATCH /forge/api/v1/vault/keys/{keyId}` | `{enabled?, priority?}` | `vault.setEnabled`, `vault.setPriority` |
-| `key.update` | `PATCH /forge/api/v1/vault/providers/{providerId}` | `{enabled}` | `forge_vault_upsert_provider` (enabled only) |
-| `key.remove` | `DELETE /forge/api/v1/vault/keys/{keyId}` | - | `forge_vault_remove_key` |
-| `circuit.action` | `POST /forge/api/v1/circuits/action` | `{level: provider|key|model, id, action: disable|enable|reset|probe}` | `forge_circuit_action` (`board.manual`) |
-| `alert.ack` | `POST /forge/api/v1/alerts/ack` | `{id}` or `{all: true}` | `alerts.acknowledge(All)` |
-| `guard.resume` | `POST /forge/api/v1/guard/resume` | `{scope}` | `guard.resume(scope)` |
+| (capability probe) | `GET /forge/api/budget` | - | 200 = mounted and token accepted, 404 = read-only engine, 401/403 = token missing/wrong |
+| `key.add` | `POST /forge/api/keys` | `{providerId, name, secret, priority?}` | 201 masked `KeyDisplay` (`id`, `masked`, ...), never the secret. Unknown provider: 404 `forge_unknown_provider` |
+| `key.test` | `POST /forge/api/keys/{id}/test` | `{modelId?}` | `ApiTestResult` (`status`: pass/fail/skipped/unsupported/rate_limited, `test: true`); real provider call |
+| `key.update` (enable/disable only) | `POST /forge/api/keys/{id}/enabled` | `{enabled}` | `{ok}` |
+| `key.remove` | `DELETE /forge/api/keys/{id}` | - | `{ok}`; unknown key 404 `forge_unknown_key` |
+| `circuit.action` | `POST /forge/api/circuits` | `{level: provider\|key\|model, providerId, keyId?, modelId?, action: disable\|enable\|reset\|probe}` | `{ok, detail?}`; missing `keyId`/`modelId` is a 400 |
 
-Note `key.update` covers priority, enable/disable of keys and providers; the client gates the buttons per action id.
+Errors are `{ "error": { "type", "message" } }` (messages redacted by the engine). A 404 with a `type` other than
+`forge_not_found` is a **refusal** (`EngineErrorKind.rejected`), not "API missing". The client refuses to send `key.add`
+over cleartext HTTP to a non-loopback host.
+
+**Not in the engine API (controls stay disabled in the app, with these reasons)**
+
+| UI control | Why it is disabled |
+|---|---|
+| key priority edit | no route (`key.priority`) |
+| provider enable/disable switch | `PUT /forge/api/providers` needs a full provider definition, which `/forge/state` does not carry (`provider.update`) |
+| acknowledge alert / acknowledge all | no route (`alert.ack`) |
+| resume runaway guard | no route (`guard.resume`) |
+
+## 4a. Where each thing lives in the app (Settings & Connections)
+
+The Control Centre (`lib/ui/engine/`) is **operational only**: dashboard, circuits (start/stop/probe a running thing),
+usage, alerts, live flow, network. It never edits configuration and never shows a credential; it deep-links to
+Settings & Connections (`lib/ui/settings/`): *Engine connection* (address, token), *Provider credentials* (the engine vault
+screen: add/test/enable/remove keys; legacy-key migration), *Notifications*, and on desktop *On-device agent*.
+Provider credentials are entered **only** in the engine vault.
+
+**Legacy keys.** Earlier builds saved provider keys (`nvidia_nim_api_key`, `anthropic_api_key`, `openai_api_key`, plus the
+refs the Dart model providers read) in the app's own secure storage (Keychain service `app.forge.secrets`). The input is
+gone. Existing copies stay readable (the on-device model providers still read them) and are flagged "legacy — move to engine".
+"Move to engine vault" (user-confirmed per key): sends the key once over `POST /forge/api/keys`, waits for the engine to
+return the new key id **and** for a fresh `/forge/state` to list it, then overwrites and deletes the old copy and verifies it
+is gone. Engine unreachable / read-only / token rejected / cleartext link / refusal / unconfirmed: nothing is deleted.
 
 ## 5. Gaps: needed from the engine, not built, not faked in the app
 
 | Missing in the engine | Effect in the app |
 |---|---|
-| Bearer-token check (in progress elsewhere) | token is sent and stored; local engines accept without one |
-| Action API of section 4 | Vault/Circuits/Alerts screens are read-only; buttons disabled with the reason |
+| Management API routes for priority, provider enable, alert ack, guard resume | those controls are disabled with the reason (section 4) |
+| Management API mounted by default (`forge-gateway.ts` does not pass `management`) | an engine started with that script is read-only for this app |
 | Budget rules in `/forge/state` (BudgetGuard rules, 402 hard stops) and an API to edit them | Usage page states that budgets cannot be shown or edited yet; only per-key capacity limits are shown |
 | History/export API (`AnalyticsStore.queryUsage/summarize/export`), latency/error/cache analytics views | no historical charts or export; only the 15-minute and all-time totals in state |
 | Logs search (`logger.search`) and trace/timeline (correlated events) over HTTP | no log viewer or trace page |
@@ -114,14 +122,31 @@ See `CONTROL_PLANE.md`, "Migration to the engine". Short version: `CircuitBreake
 `CredentialVault`, `CapabilityRouter` are deprecated and no longer used by any UI; `SupervisorEngine`, `TaskGraph` and
 `ModelTier` stay because the engine has no equivalent (supervisor/worker task-graph dispatch, directive 24-26).
 
-## 7. Verification (2026-10-03)
+## 7. Verification
 
-* Client unit/integration tests run against a fake HTTP + SSE engine written in the test (`test/forge_engine/fake_engine.dart`).
-* **Opt-in live test against the real TypeScript engine** (`test/forge_engine/live_engine_test.dart`): ran green against
-  `bun scripts/forge-gateway.ts --port 8791 --memory-secrets --ollama`. It parsed the real `/forge/state`, opened the real SSE
-  stream, drove a real `/v1/chat/completions` request and saw the real `MODEL_REQUEST_STARTED -> KEY_SELECTED -> FAILED` events
-  (typed correctly, agent id taken from `x-forge-agent`), and discovered the engine as read-only (`/forge/api/v1/capabilities` is a 404).
-* The iOS Simulator build (iPhone 17 Pro) connected to that engine over `127.0.0.1:8791`: dashboard, live-events pill and
-  "read-only engine" badge rendered from real data.
-* Not verified: bearer auth (not in the engine yet), the action API (does not exist), physical devices, a non-loopback
-  tunnel, notification permission prompts, Android emulator run.
+**2026-10-03 (read API).** Client unit/integration tests run against a fake HTTP + SSE engine (`test/forge_engine/fake_engine.dart`);
+the opt-in live test parsed the real `/forge/state`, opened the real SSE stream, drove a real `/v1/chat/completions` request and saw
+the real `MODEL_REQUEST_STARTED -> KEY_SELECTED -> FAILED` events; the iOS Simulator build connected over `127.0.0.1:8791`.
+
+**2026-10-04 (management API, Settings & Connections).** `test/forge_engine/live_engine_test.dart` ran green against the real
+TypeScript engine started from `/Volumes/Mac Laptop/Forge` with `createControlPlane({ management: { token } })` (memory secret
+store, an Ollama provider and an OpenAI-shaped provider pointing at a dead port):
+
+* no token and a wrong token: `capabilities()` reports `authRejected`, `removeKey` raises `unauthorized`;
+* `addKey` returns the masked key (the secret is not in the response, not in `/forge/state`), `/forge/state` lists it;
+* an unknown provider is a refusal with the engine's message; an unknown key is a refusal;
+* enable/disable a key, key test (real call, `test: true`), circuit disable/enable on the provider, reset on the key,
+  and the engine's 400 for a key circuit without `keyId`;
+* legacy-key migration end to end (engine confirms, fresh state lists the key, old copy deleted), then `removeKey`;
+* against the stock `scripts/forge-gateway.ts` (no `management`): `capabilities()` is read-only and the management test skips.
+
+Run it: start an engine with `management: { token }`, then
+`FORGE_LIVE_ENGINE=http://127.0.0.1:PORT FORGE_LIVE_TOKEN=... FORGE_LIVE_MANAGEMENT=1 flutter test test/forge_engine/live_engine_test.dart`.
+
+**Engine behaviour found while verifying (not changed here, engine repo is out of scope):** an idle engine sends **no** SSE
+response headers on `GET /forge/events` until its first event (there is no initial `: open` comment). The client therefore
+cannot see "stream open" until something happens; until then it shows "polling only" and its open attempt times out after 8 s
+and is retried. Recommended engine fix: write `: open\n\n` (and a periodic `: ping`) immediately.
+
+Not verified: physical devices, a non-loopback tunnel (the management API is loopback-only on the engine side, so a phone
+cannot use the action API without engine changes), notification permission prompts, the Android emulator.

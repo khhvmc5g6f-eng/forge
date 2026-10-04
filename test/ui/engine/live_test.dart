@@ -6,6 +6,7 @@ import 'package:forge/ui/engine/alert_bridge.dart';
 import 'package:forge/ui/engine/engine_console.dart';
 import 'package:forge/ui/engine/live_flow_page.dart';
 import 'package:forge/ui/panels/neural_lab/forge_neural_lab.dart';
+import 'package:forge/ui/settings/settings_nav.dart';
 
 import '../../forge_engine/fake_engine.dart';
 import 'harness.dart';
@@ -110,9 +111,12 @@ void main() {
       await pumpWithSize(tester, const EngineConsole(), size: phone);
       expect(find.byType(NavigationRail), findsNothing);
       expect(find.byType(NavigationBar), findsNothing, reason: 'the app shell owns the bottom bar');
-      for (final l in ['Dashboard', 'Vault', 'Circuits', 'Usage', 'Alerts', 'Live Flow', 'Network', 'Connection']) {
+      for (final l in ['Dashboard', 'Circuits', 'Usage', 'Alerts', 'Live Flow', 'Network']) {
         await tester.ensureVisible(find.widgetWithText(ChoiceChip, l));
       }
+      expect(find.widgetWithText(ChoiceChip, 'Vault'), findsNothing, reason: 'credentials live in Settings, not the Control Centre');
+      expect(find.widgetWithText(ChoiceChip, 'Connection'), findsNothing);
+      await tester.ensureVisible(find.widgetWithText(ActionChip, 'Settings'));
       await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Usage'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(ChoiceChip, 'Usage'));
@@ -134,9 +138,14 @@ void main() {
       await pumpWithSize(tester, const EngineConsole(), conn: conn, size: desktop);
       expect(find.textContaining('is not answering'), findsOneWidget);
       expect(find.textContaining('may be out of date'), findsOneWidget);
+      final container = ProviderScope.containerOf(tester.element(find.byType(EngineConsole)));
+      final before = container.read(settingsOpenRequestProvider);
       await tester.tap(find.textContaining('is not answering'));
       await tester.pumpAndSettle();
-      expect(find.text('Engine connection'), findsOneWidget);
+      // The console never shows connection settings itself: it deep-links to Settings & Connections.
+      expect(find.text('Engine connection'), findsNothing);
+      expect(container.read(settingsOpenRequestProvider), before + 1);
+      expect(container.read(settingsSectionProvider), SettingsSection.connection);
     });
 
     testWidgets('unread alerts show a badge on Alerts', (tester) async {

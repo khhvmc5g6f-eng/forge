@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forge/core/forge_engine/forge_engine.dart';
 import 'package:forge/ui/engine/alerts_page.dart';
@@ -7,6 +8,7 @@ import 'package:forge/ui/engine/connect_page.dart';
 import 'package:forge/ui/engine/dashboard_page.dart';
 import 'package:forge/ui/engine/usage_page.dart';
 import 'package:forge/ui/engine/vault_page.dart';
+import 'package:forge/ui/settings/settings_nav.dart';
 
 import '../../forge_engine/fake_engine.dart';
 import 'harness.dart';
@@ -90,6 +92,21 @@ void main() {
       expect(test.onPressed, isNull);
     });
 
+    testWidgets('priority and provider switches are disabled with the engine-API reason; key controls the API supports are enabled', (tester) async {
+      await pumpWithSize(tester, const VaultPage(), conn: StubConnection(), size: desktop);
+      expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Priority').first).onPressed, isNull);
+      expect(tester.widget<Switch>(find.byType(Switch).first).onChanged, isNull, reason: 'provider enable needs a full provider definition');
+      expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Test').first).onPressed, isNotNull);
+      expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Add key')).onPressed, isNotNull);
+    });
+
+    testWidgets('management API needs the token: every action is disabled and says so', (tester) async {
+      final conn = StubConnection(actions: false)..debugApply(capabilities: EngineCapabilities.authRequired);
+      await pumpWithSize(tester, const VaultPage(), conn: conn);
+      expect(find.textContaining('needs the bearer token'), findsWidgets);
+      expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Add key')).onPressed, isNull);
+    });
+
     testWidgets('add key: masked field, sent once, secret never rendered afterwards', (tester) async {
       final conn = StubConnection();
       await pumpWithSize(tester, const VaultPage(), conn: conn, size: desktop);
@@ -156,6 +173,23 @@ void main() {
       expect(t.orphans.single.id, 'gone/kx');
     });
 
+    test('orphan circuits recover provider, key and a slash-containing model id', () {
+      final n = orphanNode(EngineCircuit.fromJson({'id': 'p/k/meta/llama-3', 'level': 'model', 'state': 'open'}));
+      expect((n.providerId, n.keyId, n.modelId), ('p', 'k', 'meta/llama-3'));
+      expect((orphanNode(EngineCircuit.fromJson({'id': 'p', 'level': 'provider', 'state': 'open'})).keyId), isNull);
+    });
+
+    testWidgets('key-level circuit action sends provider and key coordinates, not the joined id', (tester) async {
+      final conn = StubConnection();
+      await pumpWithSize(tester, const CircuitsPage(), conn: conn, size: desktop);
+      // spare (k2) is open: its row has Probe now
+      await tester.tap(find.widgetWithText(TextButton, 'Probe now'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Probe'));
+      await tester.pumpAndSettle();
+      expect(conn.actionLog.single, 'circuit key openai k2 - probe');
+    });
+
     testWidgets('disable asks first, then acts; probe and reset available on an open circuit', (tester) async {
       final conn = StubConnection();
       await pumpWithSize(tester, const CircuitsPage(), conn: conn, size: desktop);
@@ -166,11 +200,11 @@ void main() {
       expect(find.textContaining('No traffic will be routed'), findsOneWidget);
       await tester.tap(find.widgetWithText(FilledButton, 'Disable'));
       await tester.pumpAndSettle();
-      expect(conn.actionLog.single, startsWith('circuit '));
-      expect(conn.actionLog.single, endsWith(' disable'));
+      // provider circuit (first card): level provider, provider id, no key, no model
+      expect(conn.actionLog.single, 'circuit provider openai - - disable');
       await tester.tap(find.widgetWithText(TextButton, 'Reset').first);
       await tester.pumpAndSettle();
-      expect(conn.actionLog.last, endsWith(' reset'));
+      expect(conn.actionLog.last, 'circuit provider openai - - reset');
       expect(tester.takeException(), isNull);
     });
 
@@ -197,28 +231,28 @@ void main() {
   });
 
   group('Alerts', () {
-    testWidgets('lists, acknowledges one and all, toggles notifications', (tester) async {
+    testWidgets('lists alerts; acknowledge and resume stay disabled with the engine-API reason; notification settings are a deep link', (tester) async {
       final conn = StubConnection(stateJson: FakeEngine.baseState(notifications: [FakeEngine.alert('a1', 'critical'), FakeEngine.alert('a2', 'warning', ack: true)]));
       await pumpWithSize(tester, const AlertsPage(), conn: conn, size: desktop);
       expect(find.text('1 unacknowledged of 2'), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.check));
+      expect(tester.widget<TextButton>(find.widgetWithText(TextButton, 'Acknowledge all')).onPressed, isNull);
+      expect(tester.widget<IconButton>(find.widgetWithIcon(IconButton, Icons.check)).onPressed, isNull);
+      expect(find.textContaining('no alert acknowledgement endpoint'), findsOneWidget);
+      expect(find.byType(Switch), findsNothing, reason: 'the notification preference is a setting, edited in Settings');
+      final container = ProviderScope.containerOf(tester.element(find.byType(AlertsPage)));
+      await tester.tap(find.text('Notification settings'));
       await tester.pump();
-      expect(conn.actionLog, ['ack a1']);
-      await tester.tap(find.text('Acknowledge all'));
-      await tester.pump();
-      expect(conn.actionLog.last, 'ack all');
-      expect(find.textContaining('No push service'), findsOneWidget);
+      expect(container.read(settingsSectionProvider), SettingsSection.notifications);
+      expect(conn.actionLog, isEmpty);
     });
 
-    testWidgets('guard scope shows burn vs baseline and can be resumed', (tester) async {
+    testWidgets('guard scope shows burn vs baseline; resume is disabled with its reason', (tester) async {
       final conn = StubConnection();
       await pumpWithSize(tester, const AlertsPage(), conn: conn, size: desktop);
       expect(find.text('session:s1'), findsOneWidget);
       expect(find.text('THROTTLE'), findsOneWidget);
       expect(find.textContaining('400% above baseline'), findsOneWidget);
-      await tester.tap(find.widgetWithText(TextButton, 'Resume'));
-      await tester.pump();
-      expect(conn.actionLog.single, 'resume session:s1');
+      expect(tester.widget<TextButton>(find.widgetWithText(TextButton, 'Resume')).onPressed, isNull);
     });
   });
 

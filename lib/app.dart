@@ -10,7 +10,8 @@ import 'ui/shell/mobile_home.dart';
 ///
 /// Phones and tablets (iOS/Android) get the engine remote: the chat workspace
 /// that drives the Cline-Enhanced engine on your Mac plus the Control Centre
-/// (vault, circuits, usage, alerts, live flow). Desktop keeps the full Forge
+/// (operational: dashboard, circuits, usage, alerts, live flow) and Settings &
+/// Connections (engine connection, provider credentials). Desktop keeps the full Forge
 /// workstation shell, whose "Control Centre" section is the same engine client.
 class MyApp extends StatelessWidget {
   const MyApp({super.key, this.forceMobile, this.autoRestoreEngine = true});

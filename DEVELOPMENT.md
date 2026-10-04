@@ -38,8 +38,9 @@ debug build with hot reload. The CLI builds independently of the Flutter toolcha
 `dart compile exe bin/forge.dart -o forge` produces a standalone `forge` binary (works on
 macOS, Linux, or Windows, since `lib/cli/` and `lib/core/` have no Flutter dependency).
 
-First run on macOS will need at least one provider API key entered via the Settings panel
-(or `forge`'s underlying `SecretsStore`) before any model call succeeds — `forge models`
+First run on macOS needs at least one provider API key in the **engine vault** (Settings & Connections > Provider
+credentials, which talks to the engine; the app no longer has its own key inputs) before any model call through the engine
+succeeds. The standalone Dart CLI and the on-device model providers still read the legacy `SecretsStore` entries — `forge models`
 and the live NVIDIA/OpenRouter listings documented in `NVIDIA.md`/`CONTROL_PLANE.md` work
 without a key, but `chat()` calls do not. The macOS Keychain-backed `SecretsStore` and the
 Accessibility-API-backed computer-use driver (`lib/core/computer/computer_control_driver.dart`)
