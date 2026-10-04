@@ -138,31 +138,71 @@ void main() {
       await expectLater(c.testKey('k1'), throwsA(isA<EngineException>().having((e) => e.kind, 'kind', EngineErrorKind.notSupported)));
     });
 
-    test('engine with actions: wire format of every action', () async {
-      engine = await FakeEngine(token: 'tk', supportsActions: true).start();
+    test('management API: capabilities probe, and the wire format of every real action', () async {
+      engine = await FakeEngine(supportsActions: true, managementToken: 'tk').start();
       final c = clientFor(engine, token: 'tk');
-      expect((await c.capabilities()).supports('circuit.action'), isTrue);
-      await c.addKey(providerId: 'openai', name: 'new', secret: 'sk-live-123', priority: 3);
-      await c.testKey('k 1');
+      final caps = await c.capabilities();
+      expect(caps.supports('key.add'), isTrue);
+      expect(caps.supports('circuit.action'), isTrue);
+      expect(caps.supports('key.priority'), isFalse, reason: 'the engine API cannot set priority');
+      expect(caps.supports('alert.ack'), isFalse);
+      final added = await c.addKey(providerId: 'openai', name: 'new', secret: 'sk-live-123', priority: 3);
+      expect(added.ok, isTrue);
+      expect(added.data['id'], 'k3');
+      expect(added.message, 'Key "new" stored in the engine vault');
+      expect(added.message + added.data.toString(), isNot(contains('sk-live-123')));
+      final t = await c.testKey('k 1');
+      expect(t.ok, isTrue);
+      expect(t.message, 'Key test: pass');
       await c.setKeyEnabled('k1', false);
-      await c.setKeyPriority('k1', 5);
       await c.removeKey('k1');
-      await c.setProviderEnabled('openai', false);
-      await c.circuitAction(level: 'key', id: 'openai/k2', action: 'probe');
-      await c.acknowledge(id: 'a1');
-      await c.acknowledge(all: true);
-      await c.resumeGuard('session:s1');
+      final probe = await c.circuitAction(level: 'key', providerId: 'openai', keyId: 'k2', action: 'probe');
+      expect(probe.message, contains('half-open'));
+      await c.circuitAction(level: 'model', providerId: 'openai', keyId: 'k2', modelId: 'gpt/x', action: 'disable');
       final a = engine.actions;
-      expect(a[0], {'method': 'POST', 'path': '/forge/api/v1/vault/keys', 'body': {'providerId': 'openai', 'name': 'new', 'secret': 'sk-live-123', 'priority': 3}});
-      expect(a[1]['path'], '/forge/api/v1/vault/keys/k%201/test');
-      expect(a[2], {'method': 'PATCH', 'path': '/forge/api/v1/vault/keys/k1', 'body': {'enabled': false}});
-      expect(a[3]['body'], {'priority': 5});
-      expect(a[4]['method'], 'DELETE');
-      expect(a[5]['path'], '/forge/api/v1/vault/providers/openai');
-      expect(a[6]['body'], {'level': 'key', 'id': 'openai/k2', 'action': 'probe'});
-      expect(a[7]['body'], {'id': 'a1'});
-      expect(a[8]['body'], {'all': true});
-      expect(a[9]['body'], {'scope': 'session:s1'});
+      expect(a[0], {'method': 'POST', 'path': '/forge/api/keys', 'body': {'providerId': 'openai', 'name': 'new', 'secret': 'sk-live-123', 'priority': 3}});
+      expect(a[1], {'method': 'POST', 'path': '/forge/api/keys/k%201/test', 'body': <String, dynamic>{}});
+      expect(a[2], {'method': 'POST', 'path': '/forge/api/keys/k1/enabled', 'body': {'enabled': false}});
+      expect(a[3]['method'], 'DELETE');
+      expect(a[3]['path'], '/forge/api/keys/k1');
+      expect(a[4], {'method': 'POST', 'path': '/forge/api/circuits', 'body': {'level': 'key', 'providerId': 'openai', 'keyId': 'k2', 'action': 'probe'}});
+      expect(a[5]['body'], {'level': 'model', 'providerId': 'openai', 'keyId': 'k2', 'modelId': 'gpt/x', 'action': 'disable'});
+    });
+
+    test('management API without or with the wrong token: capabilities says auth required, actions are unauthorized', () async {
+      engine = await FakeEngine(supportsActions: true, managementToken: 'tk').start();
+      for (final token in [null, 'wrong']) {
+        final c = clientFor(engine, token: token);
+        final caps = await c.capabilities();
+        expect(caps.authRejected, isTrue);
+        expect(caps.readOnly, isFalse);
+        expect(caps.actions, isEmpty);
+        await expectLater(c.removeKey('k1'), throwsA(isA<EngineException>().having((e) => e.kind, 'kind', EngineErrorKind.unauthorized)));
+      }
+      expect(engine.actions, isEmpty);
+    });
+
+    test('a failed key test is reported as not ok, with the engine detail', () async {
+      engine = FakeEngine(supportsActions: true)..testStatus = 'fail';
+      await engine.start();
+      final r = await clientFor(engine).testKey('k1');
+      expect(r.ok, isFalse);
+      expect(r.message, 'Key test: fail (HTTP 401)');
+    });
+
+    test('engine refusals (unknown provider / key) are "rejected", not "not supported"', () async {
+      engine = await FakeEngine(supportsActions: true).start();
+      final c = clientFor(engine);
+      await expectLater(
+          c.addKey(providerId: 'nope', name: 'n', secret: 's'),
+          throwsA(isA<EngineException>().having((e) => e.kind, 'kind', EngineErrorKind.rejected).having((e) => e.message, 'message', contains('Unknown provider'))));
+      await expectLater(c.removeKey('ghost'), throwsA(isA<EngineException>().having((e) => e.kind, 'kind', EngineErrorKind.rejected)));
+    });
+
+    test('an engine without the management route stays "not supported"', () async {
+      engine = await FakeEngine().start();
+      await expectLater(clientFor(engine).circuitAction(level: 'provider', providerId: 'openai', action: 'reset'),
+          throwsA(isA<EngineException>().having((e) => e.kind, 'kind', EngineErrorKind.notSupported)));
     });
 
     test('refuses to send a secret over cleartext to a non-loopback host', () async {

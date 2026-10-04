@@ -6,7 +6,7 @@ import '../../core/forge_engine/forge_engine.dart';
 import 'format.dart';
 import 'widgets.dart';
 
-/// Pairing: paste a `forge://` string (or type host:port) and a token. The
+/// Settings & Connections > Engine connection. Pairing: paste a `forge://` string (or type host:port) and a token. The
 /// token lives in the platform secure store and is never shown again.
 class ConnectPage extends ConsumerStatefulWidget {
   const ConnectPage({super.key});
@@ -184,7 +184,7 @@ class _ConnectPageState extends ConsumerState<ConnectPage> {
           SizedBox(height: 6),
           Note('3. Paste the forge:// pairing string here, or type the address and token. The token is stored in the Keychain / Keystore, never in plain preferences.'),
           SizedBox(height: 6),
-          Note('Engine bearer-token auth is being added to the gateway; until it ships a local engine accepts requests without a token. See docs/ENGINE_API.md.'),
+          Note('The bearer token is the engine\'s per-install gateway token. The read screens work on loopback without it, but the management API (adding, testing and removing keys, circuit actions) always requires it. See docs/ENGINE_API.md.'),
         ]),
       ),
     ]);
@@ -210,7 +210,7 @@ class _StatusRow extends StatelessWidget {
       StatusPill(label, color),
       if (conn.endpoint != null) Text(conn.endpoint!.baseUri.toString()),
       if (conn.isConnected) StatusPill(conn.eventsLive ? 'LIVE EVENTS' : 'POLLING ONLY', conn.eventsLive ? const Color(0xFF2E9E5B) : const Color(0xFFE0A100)),
-      if (conn.isConnected && conn.capabilitiesKnown) StatusPill(conn.capabilities.readOnly ? 'READ-ONLY ENGINE' : 'ACTIONS ENABLED', const Color(0xFF4A7BD0)),
+      if (conn.isConnected && conn.capabilitiesKnown) StatusPill(conn.capabilities.authRejected ? 'TOKEN NEEDED FOR ACTIONS' : conn.capabilities.readOnly ? 'READ-ONLY ENGINE' : 'ACTIONS ENABLED', const Color(0xFF4A7BD0)),
       if (at != null) Text('updated ${fmtClock(at)}'),
     ]);
   }

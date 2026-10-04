@@ -9,16 +9,25 @@ import 'widgets.dart';
 /// Provider Vault: providers and the keys under them. Keys appear only by name
 /// and the engine's masked display; the secret never comes back from the
 /// engine and is never kept after it is sent.
+///
+/// This is the one place provider credentials are entered (Settings &
+/// Connections > Provider credentials). [header] is extra content shown above
+/// the vault (the legacy-key migration panel).
 class VaultPage extends ConsumerWidget {
-  const VaultPage({super.key});
+  const VaultPage({super.key, this.header = const []});
+
+  final List<Widget> header;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final conn = ref.watch(engineConnectionProvider);
     final s = conn.state;
-    if (s == null) return const _NeedsEngine();
+    if (s == null) {
+      return PageBody(onRefresh: conn.refresh, children: [...header, const _NeedsEngine()]);
+    }
     final addBlocked = actionBlockedReason(conn, 'key.add');
     return PageBody(onRefresh: conn.refresh, children: [
+      ...header,
       Row(children: [
         Expanded(child: Text('${s.providers.length} provider(s) · ${s.keys.length} key(s)', style: Theme.of(context).textTheme.titleMedium)),
         Tooltip(
@@ -48,7 +57,7 @@ class VaultPage extends ConsumerWidget {
 class _NeedsEngine extends StatelessWidget {
   const _NeedsEngine();
   @override
-  Widget build(BuildContext context) => const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Connect to an engine to see its vault. Nothing is cached on this device.')));
+  Widget build(BuildContext context) => const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Connect to an engine to see its vault. Nothing is cached on this device.')));
 }
 
 class _ProviderCard extends ConsumerWidget {
@@ -60,7 +69,8 @@ class _ProviderCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final conn = ref.watch(engineConnectionProvider);
-    final blocked = actionBlockedReason(conn, 'key.update');
+    // The engine API cannot enable/disable a provider (the route needs a full provider definition), so this is read-only.
+    final blocked = actionBlockedReason(conn, 'provider.update');
     return Panel(
       title: provider.name,
       subtitle: '${provider.kind.isEmpty ? 'provider' : provider.kind} · ${provider.id}',
@@ -68,7 +78,7 @@ class _ProviderCard extends ConsumerWidget {
         Text(provider.enabled ? 'Enabled' : 'Disabled', style: Theme.of(context).textTheme.bodySmall),
         Tooltip(
           message: blocked ?? 'Enable or disable the whole provider',
-          child: Switch(value: provider.enabled, onChanged: blocked != null ? null : (v) => runEngineAction(context, conn, (c) => c.setProviderEnabled(provider.id, v))),
+          child: Switch(value: provider.enabled, onChanged: null),
         ),
       ]),
       child: keys.isEmpty
@@ -87,6 +97,7 @@ class _KeyTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final upd = actionBlockedReason(conn, 'key.update');
+    final prio = actionBlockedReason(conn, 'key.priority');
     final test = actionBlockedReason(conn, 'key.test');
     final rm = actionBlockedReason(conn, 'key.remove');
     final cap = k.capacity;
@@ -138,9 +149,9 @@ class _KeyTile extends StatelessWidget {
             ),
           ),
           Tooltip(
-            message: upd ?? 'Change priority (lower is preferred)',
+            message: prio ?? 'Change priority (lower is preferred)',
             child: OutlinedButton.icon(
-              onPressed: upd != null ? null : () => _priority(context),
+              onPressed: null,
               icon: const Icon(Icons.low_priority, size: 16),
               label: const Text('Priority'),
             ),
@@ -161,23 +172,6 @@ class _KeyTile extends StatelessWidget {
         ]),
       ]),
     );
-  }
-
-  Future<void> _priority(BuildContext context) async {
-    final ctl = TextEditingController(text: '${k.priority ?? 1}');
-    final v = await showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Priority for ${k.name}'),
-        content: TextField(controller: ctl, keyboardType: TextInputType.number, decoration: const InputDecoration(helperText: 'Lower number = tried first')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, int.tryParse(ctl.text.trim())), child: const Text('Save')),
-        ],
-      ),
-    );
-    ctl.dispose();
-    if (v != null && context.mounted) await runEngineAction(context, conn, (c) => c.setKeyPriority(k.id, v));
   }
 }
 

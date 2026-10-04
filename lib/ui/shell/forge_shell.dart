@@ -16,6 +16,7 @@ import '../panels/projects_panel.dart';
 import '../panels/settings_panel.dart';
 import '../panels/tasks_panel.dart';
 import '../panels/terminal_panel.dart';
+import '../settings/settings_nav.dart';
 import 'sidebar_section.dart';
 
 final selectedSectionProvider = StateProvider<SidebarSection>((ref) => SidebarSection.tasks);
@@ -32,6 +33,8 @@ class ForgeShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final section = ref.watch(selectedSectionProvider);
+    // Deep links from the Control Centre ("manage keys in Settings") land here.
+    ref.listen<int>(settingsOpenRequestProvider, (_, _) => ref.read(selectedSectionProvider.notifier).state = SidebarSection.settings);
     return Scaffold(
       body: Row(
         children: [

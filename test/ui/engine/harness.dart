@@ -19,21 +19,14 @@ class RecordingClient extends EngineClient {
   Future<EngineActionResult> addKey({required String providerId, required String name, required String secret, int? priority}) async =>
       _ok('addKey $providerId $name $secret ${priority ?? '-'}');
   @override
-  Future<EngineActionResult> testKey(String keyId) async => _ok('testKey $keyId');
+  Future<EngineActionResult> testKey(String keyId, {String? modelId}) async => _ok('testKey $keyId');
   @override
   Future<EngineActionResult> setKeyEnabled(String keyId, bool enabled) async => _ok('setKeyEnabled $keyId $enabled');
   @override
-  Future<EngineActionResult> setKeyPriority(String keyId, int priority) async => _ok('setKeyPriority $keyId $priority');
-  @override
   Future<EngineActionResult> removeKey(String keyId) async => _ok('removeKey $keyId');
   @override
-  Future<EngineActionResult> setProviderEnabled(String providerId, bool enabled) async => _ok('setProviderEnabled $providerId $enabled');
-  @override
-  Future<EngineActionResult> circuitAction({required String level, required String id, required String action}) async => _ok('circuit $level $id $action');
-  @override
-  Future<EngineActionResult> acknowledge({String? id, bool all = false}) async => _ok('ack ${all ? 'all' : id}');
-  @override
-  Future<EngineActionResult> resumeGuard(String scope) async => _ok('resume $scope');
+  Future<EngineActionResult> circuitAction({required String level, required String providerId, String? keyId, String? modelId, required String action}) async =>
+      _ok('circuit $level $providerId ${keyId ?? '-'} ${modelId ?? '-'} $action');
 }
 
 /// A connection that never touches the network.
@@ -51,9 +44,7 @@ class StubConnection extends EngineConnection {
       state: EngineState.fromJson(json),
       status: status,
       eventsLive: eventsLive,
-      capabilities: actions
-          ? const EngineCapabilities(version: '1', actions: {'key.add', 'key.test', 'key.update', 'key.remove', 'circuit.action', 'alert.ack', 'guard.resume'})
-          : EngineCapabilities.none,
+      capabilities: actions ? EngineCapabilities.managementApi : EngineCapabilities.none,
     );
     lastStateAt = DateTime.now();
   }

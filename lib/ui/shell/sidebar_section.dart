@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// The left-sidebar sections from the brief, plus `controlCentre`: the
-/// engine-backed Control Centre (dashboard, vault, circuits, usage, alerts,
-/// live flow, network). Order here is the display
+/// engine-backed Control Centre (dashboard, circuits, usage, alerts, live
+/// flow, network; operational only). Configuration lives in `settings`. Order here is the display
 /// order in the [NavigationRail].
 enum SidebarSection {
   projects(Icons.folder_outlined, 'Projects'),
@@ -19,7 +19,7 @@ enum SidebarSection {
   memory(Icons.psychology_outlined, 'Memory'),
   neuralLab(Icons.science_outlined, 'Neural Lab'),
   diagnostics(Icons.monitor_heart_outlined, 'Diagnostics'),
-  settings(Icons.settings_outlined, 'Settings');
+  settings(Icons.settings_outlined, 'Settings & Connections');
 
   const SidebarSection(this.icon, this.label);
   final IconData icon;

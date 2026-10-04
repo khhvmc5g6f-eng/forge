@@ -172,9 +172,10 @@ void main() {
 
     engine.supportsActions = true;
     final hits = engine.stateHits;
-    final r = await conn!.run((c) => c.circuitAction(level: 'key', id: 'openai/k2', action: 'reset'));
+    final r = await conn!.run((c) => c.circuitAction(level: 'key', providerId: 'openai', keyId: 'k2', action: 'reset'));
     expect(r.ok, isTrue);
-    expect(engine.actions.single['body'], {'level': 'key', 'id': 'openai/k2', 'action': 'reset'});
+    expect(engine.actions.single['path'], '/forge/api/circuits');
+    expect(engine.actions.single['body'], {'level': 'key', 'providerId': 'openai', 'keyId': 'k2', 'action': 'reset'});
     expect(engine.stateHits, greaterThan(hits));
   });
 

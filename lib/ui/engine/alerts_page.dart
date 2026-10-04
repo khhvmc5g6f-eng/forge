@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/forge_engine/forge_engine.dart';
+import '../settings/settings_nav.dart';
 import 'actions.dart';
 import 'format.dart';
 import 'widgets.dart';
@@ -32,16 +33,10 @@ class AlertsPage extends ConsumerWidget {
           child: TextButton(onPressed: null, child: const Text('Acknowledge all')),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Notify me about critical alerts'),
-            subtitle: const Text('Local notifications on this device, only while the app is running and connected. No push service.'),
-            value: notify,
-            onChanged: (v) {
-              ref.read(criticalNotificationsEnabledProvider.notifier).state = v;
-              if (v) ref.read(alertNotifierProvider).ensurePermission();
-            },
-          ),
+          Row(children: [
+            Expanded(child: Text(notify ? 'Critical alerts raise a local notification while the app is connected.' : 'Critical alert notifications are off.', style: Theme.of(context).textTheme.bodySmall)),
+            TextButton(onPressed: () => openSettings(ref, SettingsSection.notifications), child: const Text('Notification settings')),
+          ]),
           if (ackBlocked != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Note(ackBlocked, icon: Icons.lock_outline)),
           if (alerts.isEmpty) const Note('No alerts.', icon: Icons.check_circle_outline, color: Color(0xFF2E9E5B)),
           for (final a in alerts)

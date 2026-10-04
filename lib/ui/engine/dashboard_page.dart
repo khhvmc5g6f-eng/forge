@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/forge_engine/forge_engine.dart';
+import '../settings/settings_nav.dart';
 import 'format.dart';
 import 'widgets.dart';
 
@@ -66,17 +67,20 @@ List<AttentionItem> attentionItems(EngineState s) {
 }
 
 class DashboardPage extends ConsumerWidget {
-  const DashboardPage({super.key, this.onOpen});
+  const DashboardPage({super.key, this.onOpen, this.onOpenSettings});
 
-  /// Navigate to another console page by name (`vault`, `circuits`, `alerts`…).
+  /// Navigate to another console page by name (`circuits`, `alerts`…).
   final void Function(String page)? onOpen;
+
+  /// Deep-link into Settings & Connections (the dashboard never edits configuration).
+  final void Function(SettingsSection section)? onOpenSettings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final conn = ref.watch(engineConnectionProvider);
     final live = ref.watch(engineLiveProvider);
     final s = conn.state;
-    if (s == null) return _NoData(conn: conn, onOpen: onOpen);
+    if (s == null) return _NoData(conn: conn, onOpenSettings: onOpenSettings);
     final verdict = servingVerdict(s);
     final attention = attentionItems(s);
     final t = Theme.of(context).textTheme;
@@ -98,6 +102,10 @@ class DashboardPage extends ConsumerWidget {
               for (final p in s.providers)
                 StatusPill('${p.name}${p.enabled ? '' : ' (off)'}', p.enabled ? const Color(0xFF2E9E5B) : const Color(0xFF7A7F87)),
             ]),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(onPressed: () => onOpenSettings?.call(SettingsSection.credentials), icon: const Icon(Icons.key_outlined, size: 16), label: const Text('Manage providers and keys in Settings')),
+            ),
           ]),
         ),
         Panel(
@@ -143,9 +151,9 @@ class DashboardPage extends ConsumerWidget {
 }
 
 class _NoData extends StatelessWidget {
-  const _NoData({required this.conn, this.onOpen});
+  const _NoData({required this.conn, this.onOpenSettings});
   final EngineConnection conn;
-  final void Function(String page)? onOpen;
+  final void Function(SettingsSection section)? onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +175,7 @@ class _NoData extends StatelessWidget {
           const SizedBox(height: 6),
           Text(body, textAlign: TextAlign.center),
           const SizedBox(height: 16),
-          FilledButton(onPressed: () => onOpen?.call('connection'), child: const Text('Open Connection')),
+          FilledButton(onPressed: () => onOpenSettings?.call(SettingsSection.connection), child: const Text('Open engine connection settings')),
         ]),
       ),
     );

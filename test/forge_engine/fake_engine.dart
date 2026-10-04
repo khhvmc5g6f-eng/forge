@@ -4,9 +4,13 @@ import 'dart:io';
 
 /// A fake Forge engine for tests: real HTTP + SSE on a loopback port,
 /// speaking the same wire format as `gateway.ts` (`/forge/state`,
-/// `/forge/events`, `/forge/health`) plus the proposed `/forge/api/v1` actions.
+/// `/forge/events`, `/forge/health`) plus the management API of `control-api.ts`
+/// (`/forge/api/*`, always bearer-gated, 404 when the engine does not mount it).
 class FakeEngine {
-  FakeEngine({this.token, this.supportsActions = false});
+  FakeEngine({this.token, this.supportsActions = false, this.managementToken});
+
+  /// When set, only `/forge/api/*` needs this bearer (the real engine exempts loopback reads but never the management API).
+  String? managementToken;
 
   /// When set, every request must carry `Authorization: Bearer <token>`.
   String? token;
@@ -18,6 +22,12 @@ class FakeEngine {
   int stateHits = 0;
   bool failState = false;
   int? stateStatus;
+
+  /// Whether a created key shows up in the next `/forge/state` (a real engine does).
+  bool addKeyListsKey = true;
+
+  /// `ApiTestResult.status` returned by the key test route.
+  String testStatus = 'pass';
 
   HttpServer? _server;
   final List<HttpResponse> _sse = [];
@@ -81,6 +91,13 @@ class FakeEngine {
       return;
     }
     final path = req.uri.path;
+    if (supportsActions && managementToken != null && path.startsWith('/forge/api/') && req.headers.value('authorization') != 'Bearer $managementToken') {
+      res.statusCode = 401;
+      res.headers.contentType = ContentType.json;
+      res.write(jsonEncode({'error': {'type': 'forge_unauthorized', 'message': 'Management API requires a valid bearer token'}}));
+      await res.close();
+      return;
+    }
     void json(int code, Object body) {
       res.statusCode = code;
       res.headers.contentType = ContentType.json;
@@ -110,12 +127,39 @@ class FakeEngine {
         _sse.add(res);
         // Hold the connection open; replies are written by emit().
         return;
-      } else if (path == '/forge/api/v1/capabilities' && supportsActions) {
-        json(200, {'version': '1', 'actions': ['key.add', 'key.test', 'key.update', 'key.remove', 'circuit.action', 'alert.ack', 'guard.resume']});
-      } else if (path.startsWith('/forge/api/v1/') && supportsActions) {
+      } else if (path.startsWith('/forge/api/') && supportsActions) {
         final body = await utf8.decoder.bind(req).join();
+        final sub = path.substring('/forge/api/'.length);
+        if (req.method == 'GET' && sub == 'budget') {
+          json(200, {'rules': [], 'status': []});
+          await res.close();
+          return;
+        }
         actions.add({'method': req.method, 'path': path, 'body': body.isEmpty ? null : jsonDecode(body)});
-        json(200, {'ok': true, 'message': 'applied'});
+        final seg = sub.split('/');
+        if (req.method == 'POST' && sub == 'keys') {
+          final b = jsonDecode(body) as Map<String, dynamic>;
+          if (b['providerId'] == 'nope') {
+            json(404, {'error': {'type': 'forge_unknown_provider', 'message': "Unknown provider 'nope'."}});
+          } else {
+            final id = 'k${state['keys'].length + 1}';
+            final created = <String, dynamic>{'id': id, 'name': b['name'], 'providerId': b['providerId'], 'masked': 'sk-…9999', 'enabled': true, 'priority': b['priority'] ?? 1};
+            if (addKeyListsKey) state['keys'] = <dynamic>[...(state['keys'] as List), <String, dynamic>{...created, 'circuit': {'id': '${b['providerId']}/$id', 'level': 'key', 'state': 'closed'}}];
+            json(201, created);
+          }
+        } else if (seg[0] == 'keys' && seg.length == 2 && req.method == 'DELETE') {
+          json(seg[1] == 'ghost' ? 404 : 200, seg[1] == 'ghost' ? {'error': {'type': 'forge_unknown_key', 'message': "Unknown key 'ghost'"}} : {'ok': true});
+        } else if (seg[0] == 'keys' && seg.length == 3 && seg[2] == 'test') {
+          json(200, {'name': 'key_test', 'status': testStatus, 'test': true, 'durationMs': 12, 'detail': testStatus == 'pass' ? null : 'HTTP 401'});
+        } else if (seg[0] == 'keys' && seg.length == 3 && seg[2] == 'enabled') {
+          json(200, {'ok': true});
+        } else if (req.method == 'POST' && sub == 'circuits') {
+          json(200, {'ok': true, 'detail': 'circuit is half-open: the next real request is the probe'});
+        } else if (req.method == 'PUT' && sub == 'providers') {
+          json(200, {'ok': true});
+        } else {
+          json(404, {'error': {'type': 'forge_not_found', 'message': 'No management route for ${req.method} $path'}});
+        }
       } else {
         json(404, {'error': {'message': 'no route for ${req.method} $path'}});
       }
