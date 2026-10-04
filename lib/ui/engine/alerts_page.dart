@@ -17,8 +17,9 @@ class AlertsPage extends ConsumerWidget {
     final s = conn.state;
     final notify = ref.watch(criticalNotificationsEnabledProvider);
     if (s == null) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Connect to an engine to see its alerts.')));
-    final ackBlocked = actionBlockedReason(conn, 'alert.ack');
-    final guardBlocked = actionBlockedReason(conn, 'guard.resume');
+    // The engine's management API has no acknowledge/resume routes, so these stay disabled (with the reason) until it does.
+    final ackBlocked = actionBlockedReason(conn, 'alert.ack') ?? EngineCapabilities.unsupportedReasons['alert.ack'];
+    final guardBlocked = actionBlockedReason(conn, 'guard.resume') ?? EngineCapabilities.unsupportedReasons['guard.resume'];
     final alerts = [...s.notifications]..sort((a, b) => b.ts.compareTo(a.ts));
     final unread = alerts.where((a) => !a.acknowledged).length;
     final now = DateTime.fromMillisecondsSinceEpoch(s.now);
@@ -28,7 +29,7 @@ class AlertsPage extends ConsumerWidget {
         subtitle: '$unread unacknowledged of ${alerts.length}',
         trailing: Tooltip(
           message: ackBlocked ?? 'Acknowledge every alert',
-          child: TextButton(onPressed: ackBlocked != null || unread == 0 ? null : () => runEngineAction(context, conn, (c) => c.acknowledge(all: true)), child: const Text('Acknowledge all')),
+          child: TextButton(onPressed: null, child: const Text('Acknowledge all')),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SwitchListTile(
@@ -52,7 +53,7 @@ class AlertsPage extends ConsumerWidget {
               isThreeLine: true,
               trailing: a.acknowledged
                   ? const Icon(Icons.done, size: 18)
-                  : Tooltip(message: ackBlocked ?? 'Acknowledge', child: IconButton(icon: const Icon(Icons.check), onPressed: ackBlocked != null ? null : () => runEngineAction(context, conn, (c) => c.acknowledge(id: a.id)))),
+                  : Tooltip(message: ackBlocked ?? 'Acknowledge', child: IconButton(icon: const Icon(Icons.check), onPressed: null)),
             ),
         ]),
       ),
@@ -94,7 +95,7 @@ class _GuardTile extends StatelessWidget {
         if (g.needsAttention)
           Tooltip(
             message: blocked ?? 'Clear the guard level and resume',
-            child: TextButton.icon(onPressed: blocked != null ? null : () => runEngineAction(context, conn, (c) => c.resumeGuard(g.scope)), icon: const Icon(Icons.play_arrow, size: 16), label: const Text('Resume')),
+            child: TextButton.icon(onPressed: null, icon: const Icon(Icons.play_arrow, size: 16), label: const Text('Resume')),
           ),
       ]),
     );

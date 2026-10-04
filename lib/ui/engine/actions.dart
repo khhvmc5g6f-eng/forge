@@ -9,9 +9,15 @@ import 'widgets.dart';
 String? actionBlockedReason(EngineConnection c, String action) {
   if (!c.isConnected) return 'Not connected to the engine';
   if (!c.capabilitiesKnown) return 'Checking what this engine allows…';
-  if (c.capabilities.readOnly) return 'This engine is read-only: it has no action API yet (see docs/ENGINE_API.md)';
-  if (!c.capabilities.supports(action)) return 'This engine does not support "$action" yet (see docs/ENGINE_API.md)';
-  return null;
+  final caps = c.capabilities;
+  if (caps.authRejected) {
+    return c.hasToken
+        ? 'The engine\'s management API rejected the bearer token. Update it under Settings > Connection.'
+        : 'The engine\'s management API needs the bearer token. Add it under Settings > Connection.';
+  }
+  if (caps.readOnly) return 'This engine is read-only: it does not expose the management API (/forge/api). Start it with management enabled (see docs/ENGINE_API.md).';
+  if (caps.supports(action)) return null;
+  return EngineCapabilities.unsupportedReasons[action] ?? 'This engine does not support "$action" yet (see docs/ENGINE_API.md)';
 }
 
 /// Runs [action] through the connection, then reports the engine's own

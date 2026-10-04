@@ -8,8 +8,11 @@ import 'widgets.dart';
 
 /// A circuit plus where it sits in the provider -> key -> model tree.
 class CircuitNode {
-  CircuitNode({required this.level, required this.id, required this.label, required this.circuit, this.children = const []});
+  CircuitNode({required this.level, required this.id, required this.label, required this.circuit, this.children = const [], this.providerId, this.keyId, this.modelId});
   final String level, id, label;
+
+  /// Coordinates the engine's circuit action API wants (not the joined `id`).
+  final String? providerId, keyId, modelId;
 
   /// Null when the engine lists no circuit for it (never tripped, so closed).
   final EngineCircuit? circuit;
@@ -48,13 +51,33 @@ class CircuitNode {
         id: kid,
         label: k.name,
         circuit: kc,
-        children: [for (final m in models) CircuitNode(level: 'model', id: m.id, label: m.id.substring(kid.length + 1), circuit: m)],
+        providerId: p.id,
+        keyId: k.id,
+        children: [
+          for (final m in models)
+            CircuitNode(level: 'model', id: m.id, label: m.id.substring(kid.length + 1), circuit: m, providerId: p.id, keyId: k.id, modelId: m.id.substring(kid.length + 1))
+        ],
       ));
     }
-    tree.add(CircuitNode(level: 'provider', id: p.id, label: p.name, circuit: pc, children: keyNodes));
+    tree.add(CircuitNode(level: 'provider', id: p.id, label: p.name, circuit: pc, providerId: p.id, children: keyNodes));
   }
   final orphans = s.circuits.where((c) => !claimed.contains('${c.level}:${c.id}')).toList();
   return (tree: tree, orphans: orphans);
+}
+
+/// A circuit outside the vault tree: coordinates are recovered from its id
+/// (`provider`, `provider/key`, `provider/key/model` where the model may contain `/`).
+CircuitNode orphanNode(EngineCircuit c) {
+  final parts = c.id.split('/');
+  return CircuitNode(
+    level: c.level,
+    id: c.id,
+    label: c.id,
+    circuit: c,
+    providerId: parts.isNotEmpty ? parts[0] : null,
+    keyId: parts.length > 1 ? parts[1] : null,
+    modelId: parts.length > 2 ? parts.sublist(2).join('/') : null,
+  );
 }
 
 class CircuitsPage extends ConsumerWidget {
@@ -76,7 +99,7 @@ class CircuitsPage extends ConsumerWidget {
           title: 'Other circuits',
           subtitle: 'Not tied to a provider or key currently in the vault.',
           child: Column(children: [
-            for (final c in t.orphans) _CircuitRow(node: CircuitNode(level: c.level, id: c.id, label: c.id, circuit: c), state: s, conn: conn, blockedReason: blocked, depth: 0),
+            for (final c in t.orphans) _CircuitRow(node: orphanNode(c), state: s, conn: conn, blockedReason: blocked, depth: 0),
           ]),
         ),
     ]);
@@ -180,6 +203,6 @@ class _CircuitRow extends StatelessWidget {
       final ok = await confirm(context, title: 'Probe now?', message: 'The engine will send one real request through this circuit to see whether it has recovered.', action: 'Probe');
       if (!ok || !context.mounted) return;
     }
-    await runEngineAction(context, conn, (c) => c.circuitAction(level: node.level, id: node.id, action: action));
+    await runEngineAction(context, conn, (c) => c.circuitAction(level: node.level, providerId: node.providerId ?? '', keyId: node.keyId, modelId: node.modelId, action: action));
   }
 }

@@ -41,18 +41,41 @@ class EngineException implements Exception {
 }
 
 /// What this engine build lets a client change. Discovered, never assumed.
+///
+/// The real engine has no capabilities endpoint: the management API
+/// (`/forge/api/*`) is either mounted (it answers `GET /forge/api/budget` with
+/// the bearer token) or not (404). [EngineClient.capabilities] probes that and
+/// fills [actions] with the operations the real API implements.
 class EngineCapabilities {
-  const EngineCapabilities({this.version, this.actions = const {}});
+  const EngineCapabilities({this.version, this.actions = const {}, this.authRejected = false});
   factory EngineCapabilities.fromJson(Map<String, dynamic> j) =>
       EngineCapabilities(version: jStr(j['version']), actions: jStrList(j['actions']).toSet());
 
   /// The engine has no action API (read-only: state + events only).
   static const none = EngineCapabilities();
 
+  /// The management API answered 401/403: it exists but needs a (valid) bearer token.
+  static const authRequired = EngineCapabilities(authRejected: true);
+
+  /// Everything the engine's management API (`control-api.ts`) can do today.
+  static const managementApi = EngineCapabilities(version: 'forge-api', actions: managementActions);
+
+  /// Action ids the real `/forge/api/*` implements.
+  static const managementActions = {'key.add', 'key.test', 'key.update', 'key.remove', 'circuit.action'};
+
+  /// Why an action the UI knows about is still unavailable even on an engine that has the management API.
+  static const unsupportedReasons = {
+    'key.priority': 'The engine API cannot change a key\'s priority yet; do it in the Forge desktop app or forge.yaml',
+    'provider.update': 'The engine API cannot enable or disable a provider yet (it needs the full provider definition); do it in the Forge desktop app',
+    'alert.ack': 'The engine API has no alert acknowledgement endpoint yet; acknowledge alerts in the Forge desktop app',
+    'guard.resume': 'The engine API has no runaway-guard resume endpoint yet; resume in the Forge desktop app',
+  };
+
   final String? version;
   final Set<String> actions;
+  final bool authRejected;
   bool supports(String action) => actions.contains(action);
-  bool get readOnly => actions.isEmpty;
+  bool get readOnly => actions.isEmpty && !authRejected;
 }
 
 class EngineActionResult {
@@ -104,8 +127,9 @@ Stream<SseFrame> parseSse(Stream<List<int>> bytes) async* {
 /// from the injected [http.Client]; the connection manager owns lifecycle.
 ///
 /// Read API (exists today): `GET /forge/state`, `GET /forge/health`,
-/// `GET /forge/events` (SSE). Action API (`/forge/api/v1/*`) is *proposed* in
-/// docs/ENGINE_API.md; every call degrades to [EngineErrorKind.notSupported].
+/// `GET /forge/events` (SSE). Actions use the engine's token-gated management
+/// API (`/forge/api/*`, `control-api.ts`); an engine that does not mount it
+/// answers 404 and every call degrades to [EngineErrorKind.notSupported].
 class EngineClient {
   EngineClient({
     required this.endpoint,
@@ -178,21 +202,30 @@ class EngineClient {
   }
 
   // ---------------------------------------------------------- actions ----
-  // Proposed routes, see docs/ENGINE_API.md. All JSON, all need the bearer token.
+  // The engine's management API (`sdk/packages/forge/src/control-api.ts`).
+  // Every route needs `Authorization: Bearer <gateway token>` (no loopback
+  // exemption) and is loopback-only on the engine side. Secrets only go in;
+  // no response carries one.
 
-  static const _api = '/forge/api/v1';
+  static const _api = '/forge/api';
 
-  /// `GET /forge/api/v1/capabilities`. A 404 means "read-only engine".
+  /// Probes whether the engine mounts the management API. The real engine has
+  /// no capabilities route, so this asks for the (read-only) budget report:
+  /// 200 = mounted and the token works, 404 = read-only engine, 401/403 =
+  /// mounted but the token is missing or wrong.
   Future<EngineCapabilities> capabilities() async {
     try {
-      final r = await _send('GET', '$_api/capabilities');
-      return EngineCapabilities.fromJson(_decode(r));
+      await _send('GET', '$_api/budget');
+      return EngineCapabilities.managementApi;
     } on EngineException catch (e) {
       if (e.kind == EngineErrorKind.notSupported) return EngineCapabilities.none;
+      if (e.kind == EngineErrorKind.unauthorized) return EngineCapabilities.authRequired;
       rethrow;
     }
   }
 
+  /// `POST /forge/api/keys`. The engine stores the secret in the OS credential
+  /// store and answers with the masked key (`data['id']` is the new key id).
   Future<EngineActionResult> addKey({required String providerId, required String name, required String secret, int? priority}) {
     if (!endpoint.safeForSecrets) {
       throw EngineException(
@@ -200,39 +233,50 @@ class EngineClient {
         'Refusing to send an API key over unencrypted HTTP to ${endpoint.host}. Use https (or a loopback tunnel).',
       );
     }
-    return _action('POST', '$_api/vault/keys', {'providerId': providerId, 'name': name, 'secret': secret, 'priority': ?priority});
+    return _action('POST', '$_api/keys', {'providerId': providerId, 'name': name, 'secret': secret, 'priority': ?priority},
+        timeout: const Duration(seconds: 30), done: 'Key "$name" stored in the engine vault');
   }
 
-  Future<EngineActionResult> testKey(String keyId) => _action('POST', '$_api/vault/keys/${Uri.encodeComponent(keyId)}/test', const {});
+  /// `POST /forge/api/keys/{id}/test`: discovery plus a real provider call (flagged as a test by the engine).
+  Future<EngineActionResult> testKey(String keyId, {String? modelId}) =>
+      _action('POST', '$_api/keys/${Uri.encodeComponent(keyId)}/test', {'modelId': ?modelId}, timeout: const Duration(seconds: 60), testResult: true);
+
+  /// `POST /forge/api/keys/{id}/enabled`.
   Future<EngineActionResult> setKeyEnabled(String keyId, bool enabled) =>
-      _action('PATCH', '$_api/vault/keys/${Uri.encodeComponent(keyId)}', {'enabled': enabled});
-  Future<EngineActionResult> setKeyPriority(String keyId, int priority) =>
-      _action('PATCH', '$_api/vault/keys/${Uri.encodeComponent(keyId)}', {'priority': priority});
-  Future<EngineActionResult> removeKey(String keyId) => _action('DELETE', '$_api/vault/keys/${Uri.encodeComponent(keyId)}', null);
-  Future<EngineActionResult> setProviderEnabled(String providerId, bool enabled) =>
-      _action('PATCH', '$_api/vault/providers/${Uri.encodeComponent(providerId)}', {'enabled': enabled});
+      _action('POST', '$_api/keys/${Uri.encodeComponent(keyId)}/enabled', {'enabled': enabled}, done: enabled ? 'Key enabled' : 'Key disabled');
 
-  /// [action]: `disable` | `enable` | `reset` | `probe`. [level]: `provider` | `key` | `model`.
-  Future<EngineActionResult> circuitAction({required String level, required String id, required String action}) =>
-      _action('POST', '$_api/circuits/action', {'level': level, 'id': id, 'action': action});
+  /// `DELETE /forge/api/keys/{id}`.
+  Future<EngineActionResult> removeKey(String keyId) =>
+      _action('DELETE', '$_api/keys/${Uri.encodeComponent(keyId)}', null, done: 'Key removed from the engine vault');
 
-  Future<EngineActionResult> acknowledge({String? id, bool all = false}) =>
-      _action('POST', '$_api/alerts/ack', {'id': ?id, if (all) 'all': true});
-
-  Future<EngineActionResult> resumeGuard(String scope) => _action('POST', '$_api/guard/resume', {'scope': scope});
+  /// `POST /forge/api/circuits`. [action]: `disable` | `enable` | `reset` | `probe`.
+  /// [level]: `provider` | `key` | `model`; [keyId] is required for key and
+  /// model circuits and [modelId] for model circuits (the engine says so otherwise).
+  Future<EngineActionResult> circuitAction({required String level, required String providerId, String? keyId, String? modelId, required String action}) =>
+      _action('POST', '$_api/circuits', {'level': level, 'providerId': providerId, 'keyId': ?keyId, 'modelId': ?modelId, 'action': action},
+          done: 'Circuit $action done');
 
   // ---------------------------------------------------------- plumbing ----
 
-  Future<EngineActionResult> _action(String method, String path, Map<String, dynamic>? body) async {
-    final r = await _send(method, path, body: body);
+  Future<EngineActionResult> _action(String method, String path, Map<String, dynamic>? body,
+      {Duration? timeout, String done = 'Done', bool testResult = false}) async {
+    final r = await _send(method, path, body: body, timeout: timeout);
     Map<String, dynamic> j = const {};
     try {
       j = r.body.trim().isEmpty ? const {} : jMap(jsonDecode(r.body));
     } catch (_) {}
-    return EngineActionResult(ok: j['ok'] != false, message: jStr(j['message']) ?? 'Done', data: j);
+    if (testResult) {
+      // ApiTestResult: { name, status: pass|fail|skipped|unsupported|rate_limited, detail?, durationMs, test: true }
+      final status = jStr(j['status']) ?? 'unknown';
+      final detail = jStr(j['detail']);
+      return EngineActionResult(ok: status == 'pass', message: 'Key test: $status${detail == null ? '' : ' ($detail)'}', data: j);
+    }
+    // circuits: { ok, detail? }; keys: KeyDisplay (no `ok`); delete/enabled: { ok: true }
+    return EngineActionResult(ok: j['ok'] != false, message: jStr(j['message']) ?? jStr(j['detail']) ?? done, data: j);
   }
 
-  Future<http.Response> _send(String method, String path, {Map<String, dynamic>? body}) async {
+  Future<http.Response> _send(String method, String path, {Map<String, dynamic>? body, Duration? timeout}) async {
+    final limit = timeout ?? requestTimeout;
     final req = http.Request(method, _uri(path))..headers.addAll(_headers);
     if (body != null) {
       req.headers['content-type'] = 'application/json';
@@ -240,9 +284,9 @@ class EngineClient {
     }
     http.Response res;
     try {
-      res = await http.Response.fromStream(await _http.send(req).timeout(requestTimeout)).timeout(requestTimeout);
+      res = await http.Response.fromStream(await _http.send(req).timeout(limit)).timeout(limit);
     } on TimeoutException {
-      throw EngineException(EngineErrorKind.unreachable, 'The engine did not answer within ${requestTimeout.inSeconds}s');
+      throw EngineException(EngineErrorKind.unreachable, 'The engine did not answer within ${limit.inSeconds}s');
     } catch (e) {
       throw EngineException(EngineErrorKind.unreachable, 'Cannot reach the engine: ${_scrub(e)}');
     }
@@ -251,16 +295,21 @@ class EngineClient {
   }
 
   EngineException _httpError(int status, String body) {
-    String? serverMsg;
+    String? serverMsg, errType;
     try {
       final j = jMap(jsonDecode(body));
       final err = j['error'];
       serverMsg = err is Map ? jStr(err['message']) : (jStr(err) ?? jStr(j['message']));
+      errType = err is Map ? jStr(err['type']) : null;
     } catch (_) {}
     if (status == 401 || status == 403) {
       return EngineException(EngineErrorKind.unauthorized,
           status == 401 ? 'The engine rejected the token (HTTP 401). Re-pair with a valid token.' : 'The engine denied access (HTTP 403).',
           statusCode: status);
+    }
+    // The management API answers 404 for "that key/provider does not exist": a refusal, not a missing API.
+    if (status == 404 && errType != null && errType != 'forge_not_found') {
+      return EngineException(EngineErrorKind.rejected, serverMsg ?? 'Engine refused the request (HTTP 404)', statusCode: status);
     }
     if (status == 404 || status == 405 || status == 501) {
       return EngineException(EngineErrorKind.notSupported, 'This engine does not expose that endpoint (HTTP $status).', statusCode: status);
