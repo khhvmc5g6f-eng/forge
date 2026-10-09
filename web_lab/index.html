@@ -555,7 +555,7 @@ class MLP {
     for (let l = 0; l < L; l++) {
       let sq = 0;
       for (let k = 0; k < W[l].length; k++) sq += (dW[l][k] / m) ** 2;
-      gradNorms[l] = Math.sqrt(sq) / m;
+      gradNorms[l] = Math.sqrt(sq); // g is already dW/m — no second /m (bit-consistent with the Dart engine)
     }
 
     // ---- parameter update: Adam (default) or plain SGD ----

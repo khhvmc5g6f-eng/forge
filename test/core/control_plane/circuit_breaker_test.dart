@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forge/core/control_plane/circuit_breaker.dart';
 import 'package:forge/core/control_plane/circuit_breaker_registry.dart';
@@ -176,6 +178,62 @@ void main() {
       registry.resetAll();
       expect(registry.breakerFor('nvidia').state, CircuitState.closed);
       expect(registry.breakerFor('nvidia').totalFailures, 0);
+    });
+  });
+
+  group('CircuitBreakerRegistry persistence', () {
+    test('state transitions persist to disk and survive a registry restart', () {
+      final path =
+          '${Directory.systemTemp.path}/forge_circuits_test_${DateTime.now().millisecondsSinceEpoch}.json';
+      final reg = CircuitBreakerRegistry(
+        persistencePath: path,
+        defaultConfig: const CircuitBreakerConfig(
+          consecutiveFailuresToDegrade: 1,
+          consecutiveFailuresToOpen: 2,
+        ),
+      );
+      final breaker = reg.breakerFor('provider::test');
+      breaker.recordFailure(CircuitFailureType.serverError);
+      breaker.recordFailure(CircuitFailureType.serverError);
+      expect(breaker.state, CircuitState.open);
+      // Transition-driven auto-persist: the file exists without any explicit
+      // saveToDisk() call.
+      expect(File(path).existsSync(), isTrue);
+
+      final revived = CircuitBreakerRegistry(persistencePath: path)..loadFromDisk();
+      final restored = revived.breakerFor('provider::test');
+      expect(restored.state, CircuitState.open);
+      expect(restored.isAvailable, isFalse);
+      expect(restored.totalFailures, 2);
+      expect(restored.openedAt, isNotNull);
+      expect(restored.lastFailureAt, isNotNull);
+    });
+
+    test('plain success/failure tallies never touch the disk', () {
+      final path =
+          '${Directory.systemTemp.path}/forge_circuits_tally_${DateTime.now().millisecondsSinceEpoch}.json';
+      final reg = CircuitBreakerRegistry(persistencePath: path);
+      final breaker = reg.breakerFor('provider::tally');
+      breaker.recordSuccess(); // closed -> closed: no transition
+      breaker.recordFailure(CircuitFailureType.generatedCodeFailure); // non-infra
+      expect(File(path).existsSync(), isFalse);
+    });
+
+    test('a missing or corrupt persistence file loads a clean registry', () {
+      final path =
+          '${Directory.systemTemp.path}/forge_circuits_absent_${DateTime.now().millisecondsSinceEpoch}.json';
+      final reg = CircuitBreakerRegistry(persistencePath: path)..loadFromDisk();
+      expect(reg.all, isEmpty);
+
+      File(path).writeAsStringSync('{not valid json');
+      final reg2 = CircuitBreakerRegistry(persistencePath: path)..loadFromDisk();
+      expect(reg2.all, isEmpty);
+    });
+
+    test('a registry without persistencePath stays purely in-memory', () {
+      final reg = CircuitBreakerRegistry();
+      reg.breakerFor('x').recordFailure(CircuitFailureType.timeout);
+      expect(reg.all, hasLength(1));
     });
   });
 }

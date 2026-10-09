@@ -304,7 +304,10 @@ class MLP {
         final g = dW[l][k] / m;
         sq += g * g;
       }
-      gradNorms[l] = math.sqrt(sq) / m;
+      // g is already the mean gradient (dW/m), so the per-layer L2 norm needs
+      // no second division by the batch size. (Bit-consistent with the web
+      // export in web_lab/index.html, which applies the same fix.)
+      gradNorms[l] = math.sqrt(sq);
     }
 
     if (optimizer == 'adam') {

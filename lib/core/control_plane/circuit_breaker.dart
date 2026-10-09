@@ -57,11 +57,20 @@ class CircuitBreakerConfig {
 /// with any failure during `HALF_OPEN`/`RECOVERING` sending it straight back
 /// to `OPEN` rather than lingering in an ambiguous state.
 class CircuitBreaker {
-  CircuitBreaker(this.id, {CircuitBreakerConfig? config})
+  CircuitBreaker(this.id, {CircuitBreakerConfig? config, this.onStateChange})
       : config = config ?? const CircuitBreakerConfig();
 
   final String id;
   final CircuitBreakerConfig config;
+
+  /// Fired on every state *transition* (degrade/open/half-open/recover/
+  /// close, including manual overrides and persistence restores) — never on
+  /// a plain success/failure tally, so wiring this to a save callback cannot
+  /// turn into a per-request disk write. [CircuitBreakerRegistry] uses it to
+  /// keep persisted circuit state (its `circuits.json`) in sync.
+  final void Function(CircuitBreaker breaker)? onStateChange;
+
+  void _notify() => onStateChange?.call(this);
 
   CircuitState _state = CircuitState.closed;
   CircuitState get state {
@@ -129,16 +138,19 @@ class CircuitBreaker {
         if (_consecutiveSuccesses >= config.successesToCloseFromDegraded) {
           _state = CircuitState.closed;
           _consecutiveSuccesses = 0;
+          _notify();
         }
       case CircuitState.halfOpen:
         if (_consecutiveSuccesses >= config.successesToRecoverFromHalfOpen) {
           _state = CircuitState.recovering;
           _consecutiveSuccesses = 0;
+          _notify();
         }
       case CircuitState.recovering:
         if (_consecutiveSuccesses >= config.successesToCloseFromRecovering) {
           _state = CircuitState.closed;
           _consecutiveSuccesses = 0;
+          _notify();
         }
       case CircuitState.closed:
       case CircuitState.open:
@@ -172,6 +184,7 @@ class CircuitBreaker {
           _open();
         } else if (_consecutiveInfraFailures >= config.consecutiveFailuresToDegrade) {
           _state = CircuitState.degraded;
+          _notify();
         }
       case CircuitState.degraded:
         if (_consecutiveInfraFailures >= config.consecutiveFailuresToOpen) _open();
@@ -190,6 +203,7 @@ class CircuitBreaker {
     _state = CircuitState.open;
     _openedAt = DateTime.now();
     _consecutiveSuccesses = 0;
+    _notify();
   }
 
   void _maybeTransitionOutOfOpen() {
@@ -198,6 +212,7 @@ class CircuitBreaker {
         DateTime.now().difference(_openedAt!) >= config.openCooldown) {
       _state = CircuitState.halfOpen;
       _consecutiveSuccesses = 0;
+      _notify();
     }
   }
 
@@ -208,12 +223,14 @@ class CircuitBreaker {
   void manualOpen() {
     _state = CircuitState.open;
     _openedAt = DateTime.now();
+    _notify();
   }
 
   void manualClose() {
     _state = CircuitState.closed;
     _consecutiveInfraFailures = 0;
     _consecutiveSuccesses = 0;
+    _notify();
   }
 
   void resetStatistics() {
@@ -222,5 +239,47 @@ class CircuitBreaker {
     total429s = 0;
     totalTimeouts = 0;
     _recentLatencies.clear();
+  }
+
+  // ---- persistence: state survives control-plane restarts ----
+
+  /// Serialises the circuit's live state (not its config — the caller
+  /// supplies that as usual when restoring) so a restart restores
+  /// availability signals instead of treating every provider as freshly
+  /// healthy. Written by [CircuitBreakerRegistry.saveToDisk].
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'state': _state.name,
+        'consecutiveInfraFailures': _consecutiveInfraFailures,
+        'consecutiveSuccesses': _consecutiveSuccesses,
+        'totalRequests': totalRequests,
+        'totalFailures': totalFailures,
+        'total429s': total429s,
+        'totalTimeouts': totalTimeouts,
+        if (_openedAt != null) 'openedAt': _openedAt!.millisecondsSinceEpoch,
+        if (_lastFailureAt != null)
+          'lastFailureAt': _lastFailureAt!.millisecondsSinceEpoch,
+      };
+
+  /// Restores state persisted by [toJson] into this breaker. Missing or
+  /// malformed values fall back to their healthy defaults.
+  void restoreFromJson(Map<String, dynamic> json) {
+    _state = CircuitState.values.firstWhere(
+      (s) => s.name == json['state'],
+      orElse: () => CircuitState.closed,
+    );
+    _consecutiveInfraFailures = (json['consecutiveInfraFailures'] as num?)?.toInt() ?? 0;
+    _consecutiveSuccesses = (json['consecutiveSuccesses'] as num?)?.toInt() ?? 0;
+    totalRequests = (json['totalRequests'] as num?)?.toInt() ?? 0;
+    totalFailures = (json['totalFailures'] as num?)?.toInt() ?? 0;
+    total429s = (json['total429s'] as num?)?.toInt() ?? 0;
+    totalTimeouts = (json['totalTimeouts'] as num?)?.toInt() ?? 0;
+    _openedAt = (json['openedAt'] as num?) == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch((json['openedAt'] as num).toInt());
+    _lastFailureAt = (json['lastFailureAt'] as num?) == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch((json['lastFailureAt'] as num).toInt());
+    _notify();
   }
 }
