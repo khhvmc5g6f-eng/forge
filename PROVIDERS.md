@@ -62,9 +62,11 @@ Forge-owned runtime**:
 - the `serve` process is spawned and supervised as a Forge child (`OLLAMA_HOST` and
   `OLLAMA_MODELS` are pinned to Forge-owned values), with a health-checked start,
   graceful-then-forced stop, and the phase machine
-  `notInstalled → installing → stopped → starting → running/failed`;
+  `notInstalled → installing → stopped → starting → running/failed`. A server Forge
+  did not spawn is never silently adopted: if a separately installed Ollama already
+  answers on the configured port, the managed runtime takes the next free one;
 - the existing `OllamaProvider` adapter simply points at the runtime's OpenAI-compatible
-  endpoint (`http://127.0.0.1:11434/v1/`), so the Model Router, circuit breakers and
+  endpoint (the live `openAiBaseUrl`), so the Model Router, circuit breakers and
   Model Arena treat local models like any other provider — free and local for routing.
 
 The Models panel exposes Start/Stop and a pull field against this runtime. Every OS or

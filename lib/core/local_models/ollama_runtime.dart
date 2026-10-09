@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:collection/collection.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
@@ -197,7 +198,14 @@ class OllamaRuntime {
   File get binary =>
       File(p.join(binDir.path, Platform.isWindows ? 'ollama.exe' : 'ollama'));
 
-  Uri get baseUrl => Uri.parse('http://${config.host}:${config.port}');
+  int? _effectivePort;
+
+  /// The port this instance actually serves on — [OllamaRuntimeConfig.port]
+  /// when it is free, otherwise the next free port above it. A separately
+  /// installed server must never be silently adopted.
+  int get effectivePort => _effectivePort ?? config.port;
+
+  Uri get baseUrl => Uri.parse('http://${config.host}:$effectivePort');
   Uri get _tagsUri => baseUrl.resolve('api/tags');
   Uri get _pullUri => baseUrl.resolve('api/pull');
 
@@ -249,15 +257,49 @@ class OllamaRuntime {
     if (_process != null) return; // a start is already in flight
     _setPhase(LocalRuntimePhase.starting);
     try {
-      _process = await _spawner(binary.path, ['serve'], {
-        'OLLAMA_HOST': '${config.host}:${config.port}',
+      // Never silently adopt a server we did not spawn: if something
+      // already answers on this port (a separately installed Ollama, say),
+      // take the next free port instead of routing through a foreign one.
+      const maxPortSkips = 10;
+      var port = config.port;
+      var foundFreePort = false;
+      for (var attempt = 0; attempt <= maxPortSkips; attempt++) {
+        final candidate =
+            Uri.parse('http://${config.host}:${config.port + attempt}/api/tags');
+        if (!await _healthProbe(candidate)) {
+          port = config.port + attempt;
+          foundFreePort = true;
+          break;
+        }
+      }
+      if (!foundFreePort) {
+        throw LocalRuntimeException('no free port in '
+            '${config.host}:${config.port}-${config.port + maxPortSkips}');
+      }
+      _effectivePort = port;
+
+      final process = await _spawner(binary.path, ['serve'], {
+        'OLLAMA_HOST': '${config.host}:$port',
         'OLLAMA_MODELS': modelsDir.path,
       });
+      var childDied = false;
+      unawaited(process.exitCode.then((_) => childDied = true));
+      _process = process;
+
       final deadline = DateTime.now().add(config.startupTimeout);
       while (DateTime.now().isBefore(deadline)) {
         if (await _healthProbe(_tagsUri)) {
+          if (childDied) {
+            throw LocalRuntimeException('a different server answered '
+                '$_tagsUri after the managed child exited — refusing to '
+                'adopt a foreign server');
+          }
           _setPhase(LocalRuntimePhase.running);
           return;
+        }
+        if (childDied) {
+          throw LocalRuntimeException(
+              'the managed serve process exited before becoming healthy');
         }
         await Future<void>.delayed(config.pollInterval);
       }
@@ -368,13 +410,43 @@ class OllamaRuntimeProvisioner {
     }
   }
 
-  /// Extracts the `ollama` CLI server from the macOS app-bundle layout
-  /// inside the distribution zip into [binDir] and makes it executable.
+  /// Extracts the `ollama` CLI server — plus its sibling native backend
+  /// libraries, when the distribution ships them — into [binDir] and makes
+  /// the CLI executable. The member path is *discovered* from the zip
+  /// listing rather than hardcoded: the bundle layout moved between
+  /// releases (older distributions used `Contents/Resources/macos/ollama`,
+  /// newer ones `Contents/Resources/ollama`), so matching by filename keeps
+  /// provisioning working across both. The match is case-sensitive, which
+  /// also rejects the GUI launcher (`…/MacOS/Ollama`) in favour of the CLI.
   static Future<void> installFromZip(File zip, Directory binDir) async {
     binDir.createSync(recursive: true);
+    final listing = await Process.run('unzip', ['-Z1', zip.path]);
+    if (listing.exitCode != 0) {
+      throw LocalRuntimeException(
+          'unzip -Z1 failed (${listing.exitCode}): ${listing.stderr}');
+    }
+    final members = (listing.stdout as String)
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+    final cliName = Platform.isWindows ? 'ollama.exe' : 'ollama';
+    final cliMember =
+        members.firstWhereOrNull((m) => m == cliName || m.endsWith('/$cliName'));
+    if (cliMember == null) {
+      throw LocalRuntimeException(
+          'no $cliName binary member found in ${zip.path}');
+    }
+    // Sibling .so/.dylib backends in the same bundle directory — the server
+    // loads its ggml/acceleration backends relative to the executable.
+    final cliDir = p.dirname(cliMember);
+    final siblings = members
+        .where((m) => p.dirname(m) == cliDir)
+        .where((m) => m.endsWith('.so') || m.endsWith('.dylib'))
+        .toList();
     final result = await Process.run(
       'unzip',
-      ['-j', zip.path, 'Ollama.app/Contents/Resources/macos/ollama', '-d', binDir.path],
+      ['-j', zip.path, ...[cliMember, ...siblings], '-d', binDir.path],
     );
     if (result.exitCode != 0) {
       throw LocalRuntimeException(

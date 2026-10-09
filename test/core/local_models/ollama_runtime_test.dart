@@ -66,7 +66,7 @@ void main() {
           environment = env;
           return _FakeProcess();
         },
-        healthProbe: (_) async => true,
+        healthProbe: _freeThenHealthy(),
       );
       await runtime.ensureRunning();
       expect(runtime.phase, LocalRuntimePhase.running);
@@ -90,7 +90,7 @@ void main() {
           spawns++;
           return _FakeProcess();
         },
-        healthProbe: (_) async => true,
+        healthProbe: _freeThenHealthy(),
       );
       await runtime.ensureRunning();
       await runtime.ensureRunning();
@@ -133,7 +133,7 @@ void main() {
           spawns++;
           return _FakeProcess();
         },
-        healthProbe: (_) async => true,
+        healthProbe: _freeThenHealthy(),
       );
       await runtime.ensureRunning();
       await runtime.stop();
@@ -164,7 +164,7 @@ void main() {
           pollInterval: const Duration(milliseconds: 5),
         ),
         spawner: (_, _, _) async => _FakeProcess(),
-        healthProbe: (_) async => true,
+        healthProbe: _freeThenHealthy(),
         pullStreamer: (_, _) async => Stream.fromIterable([
           '{"status":"pulling manifest"}',
           '',
@@ -189,12 +189,64 @@ void main() {
           pollInterval: const Duration(milliseconds: 5),
         ),
         spawner: (_, _, _) async => _FakeProcess(),
-        healthProbe: (_) async => true,
+        healthProbe: _freeThenHealthy(),
         pullStreamer: (_, _) async =>
             Stream.fromIterable(['{"error":"no space left on device"}']),
       );
       await expectLater(runtime.pullModel('big-model').toList(),
           throwsA(isA<LocalRuntimeException>()));
+    });
+  });
+
+  group('OllamaRuntime foreign-server safety', () {
+    test('takes the next free port instead of adopting a foreign server',
+        () async {
+      final base = tempBase();
+      preinstallBinary(base);
+      late Map<String, String> spawnEnv;
+      var probeCalls = 0;
+      final runtime = OllamaRuntime(
+        config: OllamaRuntimeConfig(
+          baseDir: base.path,
+          startupTimeout: const Duration(seconds: 1),
+          pollInterval: const Duration(milliseconds: 5),
+        ),
+        spawner: (_, _, env) async {
+          spawnEnv = env;
+          return _FakeProcess();
+        },
+        healthProbe: (_) async {
+          probeCalls++;
+          if (probeCalls == 1) return true; // foreign server on 11434
+          if (probeCalls == 2) return false; // 11435 is free
+          return true; // our child becomes healthy there
+        },
+      );
+      await runtime.ensureRunning();
+      expect(runtime.effectivePort, 11435);
+      expect(spawnEnv['OLLAMA_HOST'], '127.0.0.1:11435');
+      expect(runtime.openAiBaseUrl.toString(), 'http://127.0.0.1:11435/v1/');
+    });
+
+    test('refuses to run when the child died but a foreign server answers',
+        () async {
+      final base = tempBase();
+      preinstallBinary(base);
+      final process = _FakeProcess()..kill(); // already exited
+      var probeCalls = 0;
+      final runtime = OllamaRuntime(
+        config: OllamaRuntimeConfig(
+          baseDir: base.path,
+          startupTimeout: const Duration(seconds: 1),
+          pollInterval: const Duration(milliseconds: 5),
+        ),
+        spawner: (_, _, _) async => process,
+        healthProbe: (_) async => ++probeCalls != 1, // free, then "healthy"
+      );
+      await expectLater(
+          runtime.ensureRunning(), throwsA(isA<LocalRuntimeException>()));
+      expect(runtime.phase, LocalRuntimePhase.failed);
+      expect(runtime.lastError, contains('foreign server'));
     });
   });
 
@@ -228,4 +280,13 @@ class _FakeProcess implements SpawnedProcess {
 
   @override
   Future<int> get exitCode => _exit.future;
+}
+
+/// Health-probe fake for the lifecycle tests: odd calls are port pre-checks
+/// (report the port as free), even calls are post-spawn health checks
+/// (report the managed server as healthy) — one pre-check plus one
+/// successful health poll per start, including across stop/restart cycles.
+HealthProbe _freeThenHealthy() {
+  var calls = 0;
+  return (_) async => ++calls % 2 == 0;
 }
