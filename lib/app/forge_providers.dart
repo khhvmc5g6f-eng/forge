@@ -13,6 +13,7 @@ import '../core/control_plane/model_tier.dart';
 import '../core/devices/device_manager.dart';
 import '../core/git/checkpoint.dart';
 import '../core/git/git_service.dart';
+import '../core/local_models/ollama_runtime.dart';
 import '../core/mcp/mcp_manager.dart';
 import '../core/memory/memory_store.dart';
 import '../core/project/project_manager.dart';
@@ -75,6 +76,29 @@ final taskManagerProvider = Provider<TaskManager>((ref) {
 });
 
 final modelRegistryProvider = Provider<ModelRegistry>((ref) => ModelRegistry());
+
+/// Live phase of the built-in local-model runtime, mirrored from
+/// [ollamaRuntimeProvider]'s onPhaseChange so the Models panel can watch it
+/// reactively.
+final localRuntimePhaseProvider =
+    StateProvider<LocalRuntimePhase>((ref) => LocalRuntimePhase.notInstalled);
+
+/// Forge's **built-in** local-model runtime (`lib/core/local_models/`):
+/// Forge provisions the Ollama server binary under
+/// `~/.forge/runtime/ollama/bin`, stores pulled models under
+/// `~/.forge/runtime/ollama/models` (never `~/.ollama`), and supervises the
+/// `serve` process itself — no separate Ollama installation. The Models
+/// panel's Start/Stop/Pull controls and "Refresh local" both go through
+/// this provider; the existing `OllamaProvider` adapter simply points at
+/// the managed endpoint.
+final ollamaRuntimeProvider = Provider<OllamaRuntime>((ref) {
+  final runtime = OllamaRuntime(
+    onPhaseChange: (phase) =>
+        ref.read(localRuntimePhaseProvider.notifier).state = phase,
+  );
+  ref.onDispose(runtime.stop);
+  return runtime;
+});
 
 /// Every configured provider adapter, keyed by provider id — the Control
 /// Plane's "federated" fleet: NVIDIA NIM, Groq, Cerebras, OpenRouter, Z.AI,

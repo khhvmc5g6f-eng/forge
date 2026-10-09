@@ -47,3 +47,31 @@ escalate only if none qualifies — the brief's default policy), `freeOnly`, `lo
 See `SECURITY.md#secrets`. In short: `SecretsStore` is the only place an API key is
 read/written; never store one in a config file, Git, or a `ProviderConfig` (which only ever
 carries a `apiKeySecretRef` lookup key, never the value itself).
+
+## Built-in local runtime (no separate Ollama installation)
+
+Forge does not require Ollama — or any local inference server — to be installed as a
+separate system. `lib/core/local_models/ollama_runtime.dart` implements a **built-in,
+Forge-owned runtime**:
+
+- the server binary is provisioned under `~/.forge/runtime/ollama/bin`, downloaded from
+  the official distribution zip on first use (or extracted from a staged copy under
+  `~/.forge/runtime/ollama/downloads/`);
+- pulled models live under `~/.forge/runtime/ollama/models` — never `~/.ollama`, so
+  nothing leaks outside Forge's managed directory;
+- the `serve` process is spawned and supervised as a Forge child (`OLLAMA_HOST` and
+  `OLLAMA_MODELS` are pinned to Forge-owned values), with a health-checked start,
+  graceful-then-forced stop, and the phase machine
+  `notInstalled → installing → stopped → starting → running/failed`;
+- the existing `OllamaProvider` adapter simply points at the runtime's OpenAI-compatible
+  endpoint (`http://127.0.0.1:11434/v1/`), so the Model Router, circuit breakers and
+  Model Arena treat local models like any other provider — free and local for routing.
+
+The Models panel exposes Start/Stop and a pull field against this runtime. Every OS or
+network operation is an injected seam, so the unit tests
+(`test/core/local_models/ollama_runtime_test.dart`) exercise the full lifecycle without
+spawning processes or opening sockets. End-to-end against the real binary:
+
+    dart run tool/verify_runtime.dart
+    dart run tool/verify_runtime.dart --pull qwen2.5-coder:7b
+

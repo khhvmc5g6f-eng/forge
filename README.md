@@ -21,6 +21,12 @@ verification against real external services:
 - Provider-agnostic model layer: NVIDIA NIM, OpenAI, Ollama, LM Studio, Anthropic adapters
   (`lib/core/models/`) — `forge models` performs a real, live call to NVIDIA's public
   `/v1/models` endpoint and lists the current catalogue.
+- **Built-in local-model runtime** (`lib/core/local_models/`) — Forge owns the Ollama
+  stack end-to-end: the server binary is provisioned under `~/.forge/runtime/ollama/bin`,
+  pulled models live under `~/.forge/runtime/ollama/models` (never `~/.ollama`), and the
+  `serve` process is a supervised Forge child with a health-checked start, graceful stop
+  and UI Start/Stop/Pull controls — no separate Ollama installation; the existing adapter
+  just points at the managed endpoint.
 - Model Registry + Router with a Model Arena-ready performance-tracking data model
   (`lib/core/models/model_registry.dart`, `model_router.dart`).
 - Tool Gateway + deterministic Policy Engine with the full SAFE→PRIVILEGED command
