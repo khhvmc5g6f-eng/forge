@@ -1,0 +1,60 @@
+{
+  "snapshot_date": "2026-10-09",
+  "classification_rules": "MEASURED = live Base44 API today; ESTIMATED = arithmetic from published rates, not billing data",
+  "critical_finding": {
+    "id": "XCVF-OBS-CREDIT-001",
+    "state": "WORKSPACE OUT OF INTEGRATION CREDITS",
+    "last_successful_run_at": "2026-10-08T02:16:07Z (Safety Assertion Check, credits_consumed 0.2)",
+    "evidence": "all runs 2026-10-08 late -> 2026-10-09 17:40 UTC status=cancelled, status_reason=insufficient_credits, credits_consumed=0.0"
+  },
+  "steady_state_scheduled_load_2026_10_09": {
+    "note": "all cancelled today due to zero credits; counts are scheduled fire rate from live stats API",
+    "workflows": [
+      {"name": "Live Ops Tick", "runs_per_day": 288, "cadence": "*/5"},
+      {"name": "Flight Plan Overdue Scan", "runs_per_day": 144, "cadence": "*/10"},
+      {"name": "Safety Assertion Check", "runs_per_day": 96},
+      {"name": "AirGuardian Biomechanics Enrichment Scan", "runs_per_day": 72},
+      {"name": "AirGuardian Pipeline Health Check", "runs_per_day": 48},
+      {"name": "UK NOTAM Ingestion", "runs_per_day": 24},
+      {"name": "Telemetry Self Diagnostic", "runs_per_day": "hourly"},
+      {"name": "Integration Usage Rollup", "runs_per_day": "hourly at :05"},
+      {"name": "Module Flow Hourly Snapshot", "runs_per_day": "hourly"},
+      {"name": "Entity Growth Snapshot", "runs_per_day": 4},
+      {"name": "XContest Flight Poll", "runs_per_day": "scheduled"},
+      {"name": "API Key Pool Self-Heal", "runs_per_day": "scheduled"},
+      {"name": "Synthetic Health Check", "runs_per_day": 12},
+      {"name": "AirSentry Expire Stale Monitoring", "runs_per_day": "hourly"},
+      {"name": "Club File Bin Purge", "runs_per_day": 1}
+    ]
+  },
+  "published_rates_verified_2026_09_26": {
+    "workflow_step": "10 steps ~= 1 credit",
+    "backend_function_invocation": "100 invocations ~= 1 credit",
+    "entity_read_write": "free"
+  },
+  "remediation_history": {
+    "baseline_2026_09_26": {"runs_per_7d": 38057, "est_credits_per_week": "5000-6000 (ESTIMATED)"},
+    "post_remediation_2026_09_27": {"runs_per_day": 1222, "credits_per_day": 244, "reduction_pct": -79, "projected_per_month": 7300, "basis": "MEASURED from Base44 credits_consumed per run"}
+  },
+  "credit_governor_state": {
+    "integration_usage_event": "live, per-op metering, op/fn/module/caller/trigger/est_credits/ts",
+    "integration_usage_rollup": "live, hourly folds + anomaly detection + retention purge",
+    "integration_budget_rows": 9,
+    "budget_scope": "client_fn only",
+    "budget_action": "alert only",
+    "gaps": [
+      "no global allowance budget",
+      "no suspend/drain action before zero",
+      "no safety-exempt last-standing ordering",
+      "no Forge-side watcher for status_reason=insufficient_credits (outage was invisible until this audit)"
+    ]
+  },
+  "method": {
+    "refresh": [
+      "GET /api/apps/{app_id}/workflows/stats",
+      "GET /api/apps/{app_id}/workflows/runs?since=...&status=completed|failed|cancelled",
+      "query IntegrationUsageRollup / IntegrationUsageEvent / IntegrationBudget",
+      "authoritative balance: Base44 workspace Credits panel (no reachable API)"
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "snapshot_date": "2026-10-09",
+  "measurement_class": "MEASURED unless noted",
+  "base44_app": {
+    "name": "XC Vario Flight",
+    "id": "6a65fedb80f652b484634b58",
+    "status": "ready",
+    "entity_count": 491,
+    "workflow_registry": "63 workflows documented at 2026-09-26 baseline; live list API queried 2026-10-09"
+  },
+  "repositories": {
+    "monorepo": "/Volumes/Mac Laptop/XCVarioFlight",
+    "remote": "https://github.com/khhvmc5g6f-eng/XC-Vario-Flight.git",
+    "local_main": "21698d7d",
+    "origin_main": "fa782b54",
+    "local_behind_origin": 128,
+    "uncommitted_local_changes": ["docs/integration-credits/05_FINAL_REVIEW.md (M)", "docs/jev-audit/ (untracked)"],
+    "flutter_app": {
+      "name": "xcvarioflight_app",
+      "version": "1.0.0+4",
+      "dart_sdk": "^3.12.2",
+      "lib_dart_files": 2084,
+      "modules_dart_files": "approx 1400 (module library)",
+      "test_dart_files": 1400,
+      "integration_test_files": 1,
+      "sdk": "Flutter 3.44.8 stable at ~/development/flutter"
+    },
+    "web_app": "React/Vite with base44/ mirror; eslint + web-ci present",
+    "services": ["http-proxy", "ogn-worker"],
+    "firmware": "nRF52 PlatformIO project",
+    "ci_workflows": ["flutter-ci.yml", "web-ci.yml", "security-scan.yml", "windows-widgets.yml"]
+  },
+  "prior_audit_artifacts": {
+    "credit_forensics": "docs/integration-credits/ (7 evidence packs + 13 docs, 2026-09-26..10-03)",
+    "defect_register": "docs/jev-audit/04_DEFECT_REGISTER.md (232 findings, 5 S1 root problems)",
+    "test_baseline": "docs/jev-audit/evidence/verify.md (2026-10-03: 12926/12995 pass, 57 fail)"
+  },
+  "merged_remediations_verified_in_128_commit_delta": [
+    "PR #43 fix/emergency-keeps-flight-airborne (INTEL-002)",
+    "PR #42 fix/web-app-version-import",
+    "PR #55 fix/sos-offline-retry-and-honest-state (OFFLINE-001/003)",
+    "PR #59 fix/crash-evidence-reaches-escalation-threshold (INTEL-001)",
+    "PR #58 fix/port-burst-cancel-and-false-trigger-fixes (REPO-001)",
+    "PR #54 fix/membership-through-manage-membership (REPO-002)",
+    "PR #46 fix/firmware-airtime-gate-and-ci (RADIO-001)",
+    "PR #56 fix/secure-token-storage-pending-timer",
+    "PR #53 fix/migration-tests-from-real-historical-schemas",
+    "PR #51 fix/macos-build (PLATFORM-001)",
+    "PR #68 feat/stale-data-and-degraded-states (freshness/TTL)"
+  ]
+}
