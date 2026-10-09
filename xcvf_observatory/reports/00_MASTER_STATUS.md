@@ -20,6 +20,17 @@ per task, what exists with evidence, what is live-verified today, and what remai
   `docs/jev-audit/evidence/verify.md`): 12,926/12,995 Flutter tests passed,
   57 failed. Fresh `flutter analyze` launched 2026-10-09. **GAP:** re-run full
   test suite on current origin/main and triage the 57 failures.
+  - **2026-10-09 analyze addendum (MEASURED, environment-limited):**
+    `flutter analyze` on the *stale* local checkout (128 behind origin/main,
+    unresolved `package_config`) reported 32,721 issues: 31,273 errors, 0
+    warnings, 91 infos. Dominated by `uri_does_not_exist` for core packages
+    (dio ×235, drift ×226, shared_preferences ×135, latlong2 ×131, go_router
+    ×124, flutter_map ×80…) and derived undefined-class/method cascades —
+    i.e. `pub get` was not resolvable on this checkout, NOT 31k app defects.
+    Log preserved at `/tmp/xcvf_analyze_1791567842.log`. A valid analyze
+    requires: fast-forward to origin/main → `flutter pub get` → re-analyze.
+    The only trustworthy current figures remain the 2026-10-03 test run.
+
 
 ## Phase 2 — Base44 credit audit (priority)
 
