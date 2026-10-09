@@ -128,6 +128,7 @@ and does not work outside macOS.
 | [`CONTROL_PLANE.md`](CONTROL_PLANE.md) | Multi-provider circuit breakers, tiers, Task Graph/Supervisor engine, LiteLLM decision |
 | [`CLINE_AUDIT.md`](CLINE_AUDIT.md) | What was reused/adapted/rejected from Cline before building the Control Plane |
 | [`CLAUDE_REVIEW.md`](CLAUDE_REVIEW.md) | Independent review + Claude Final Review pipeline |
+| [`NEURAL_OBSERVATORY.md`](NEURAL_OBSERVATORY.md) | The Observatory telemetry subsystem: sessions, spans, health, model intelligence, self-improvement gates |
 | [`CLI.md`](CLI.md) | `forge`/`aiwork` command reference |
 | [`PERMISSIONS.md`](PERMISSIONS.md) | Operating modes, permission ladder, mappings |
 | [`DEVELOPMENT.md`](DEVELOPMENT.md) | Milestones, build instructions, what's stubbed |

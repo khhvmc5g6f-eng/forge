@@ -11,6 +11,7 @@ import '../core/models/model_registry.dart';
 import '../core/models/model_router.dart';
 import '../core/models/providers/nvidia_nim_provider.dart';
 import '../core/models/task_classifier.dart';
+import '../core/observability/telemetry_store.dart';
 import '../core/project/project_manager.dart';
 import '../core/security/secrets_store.dart';
 import '../core/tasks/task.dart';
@@ -34,7 +35,8 @@ Future<int> runForgeCli(List<String> arguments) async {
     ..addCommand(ModelsCommand())
     ..addCommand(McpCommand())
     ..addCommand(StatusCommand())
-    ..addCommand(ResumeCommand());
+    ..addCommand(ResumeCommand())
+    ..addCommand(ObservatoryCommand());
 
   try {
     final result = await runner.run(arguments);
@@ -367,3 +369,123 @@ class ResumeCommand extends Command<int> {
     return 0;
   }
 }
+
+/// `forge observatory` — a headless Neural Observatory summary for the
+/// current project: aggregates the persisted JSONL telemetry (the same
+/// store the desktop Observatory reads) into per-model request counts,
+/// latency percentiles, token totals and cost availability. Everything
+/// printed comes from recorded spans; an empty store says so plainly
+/// rather than inventing a table.
+class ObservatoryCommand extends Command<int> {
+  @override
+  final name = 'observatory';
+  @override
+  final description =
+      'Print a Neural Observatory summary from persisted telemetry.';
+
+  @override
+  Future<int> run() async {
+    final store = JsonlTelemetryStore(Directory.current.path);
+    final events = await store.readAll();
+    if (events.isEmpty) {
+      stdout.writeln(
+          'No telemetry recorded for this project yet (.forge/observability/).');
+      stdout.writeln(
+          'Telemetry accumulates as instrumented sessions, agent runs and '
+          'provider requests happen.');
+      return 0;
+    }
+
+    final sessions = <String>{};
+    final models = <String, _ModelAggregate>{};
+    var toolCalls = 0;
+    var toolFailures = 0;
+    var networkEvents = 0;
+
+    for (final event in events) {
+      final name = event['name'] as String?;
+      final sessionId = event['sessionId'] as String?;
+      if (sessionId != null && sessionId != 'global') sessions.add(sessionId);
+      // Attributes are mixed JSON types (strings, numbers, booleans) —
+      // cast to dynamic values, then read each field by its real type.
+      final attributes = (event['attributes'] as Map?)?.cast<String, dynamic>();
+      switch (name) {
+        case 'model.request':
+          final model = attributes?['model'] as String? ?? 'unknown';
+          final aggregate =
+              models.putIfAbsent(model, () => _ModelAggregate());
+          aggregate.requests++;
+          final latency = (attributes?['latencyMs'] as num?)?.toDouble();
+          if (latency != null) aggregate.latencies.add(latency);
+          if (attributes?['succeeded'] == false) aggregate.failures++;
+          if (attributes?['rateLimited'] == true) aggregate.rateLimited++;
+          aggregate.promptTokens +=
+              (attributes?['promptTokens'] as num?)?.toInt() ?? 0;
+          aggregate.completionTokens +=
+              (attributes?['completionTokens'] as num?)?.toInt() ?? 0;
+          final cost = attributes?['costUsd'] as num?;
+          if (cost != null) {
+            aggregate.costKnown = true;
+            aggregate.costUsd += cost.toDouble();
+          } else {
+            aggregate.costKnown = false;
+          }
+        case 'tool.call':
+          toolCalls++;
+          if (attributes?['succeeded'] == false) toolFailures++;
+        case 'network.traffic':
+          networkEvents++;
+        default:
+          break;
+      }
+    }
+
+    final latencies = models.values
+        .expand((a) => a.latencies)
+        .toList(growable: false)
+      ..sort();
+    double? percentile(List<double> sorted, double q) => sorted.isEmpty
+        ? null
+        : sorted[((q * (sorted.length - 1)).floor())];
+
+    stdout.writeln('Sessions retained: ${sessions.length}');
+    stdout.writeln('Model requests: '
+        '${models.values.map((a) => a.requests).fold(0, (a, b) => a + b)}');
+    stdout.writeln('Tool calls: $toolCalls ($toolFailures failed)');
+    stdout.writeln('Network traffic events: $networkEvents');
+    if (latencies.isNotEmpty) {
+      final p50 = percentile(latencies, 0.50)!.round();
+      final p95 = percentile(latencies, 0.95)!.round();
+      stdout.writeln('Request latency (measured): '
+          'p50 ${p50}ms · p95 ${p95}ms over ${latencies.length} requests');
+    }
+    if (models.isNotEmpty) {
+      stdout.writeln('');
+      stdout.writeln('Per-model (from persisted spans):');
+      for (final entry in models.entries) {
+        final a = entry.value;
+        a.latencies.sort();
+        stdout.writeln(
+          '  ${entry.key}\n'
+          '    requests: ${a.requests} · failures: ${a.failures} · '
+          '429s: ${a.rateLimited}\n'
+          '    tokens: ${a.promptTokens} in / ${a.completionTokens} out\n'
+          '    cost: ${a.costKnown ? '\$${a.costUsd.toStringAsFixed(4)}' : 'unavailable (no configured pricing)'}',
+        );
+      }
+    }
+    return 0;
+  }
+}
+
+class _ModelAggregate {
+  int requests = 0;
+  int failures = 0;
+  int rateLimited = 0;
+  int promptTokens = 0;
+  int completionTokens = 0;
+  bool costKnown = true;
+  double costUsd = 0;
+  final List<double> latencies = [];
+}
+

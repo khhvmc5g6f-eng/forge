@@ -2,6 +2,7 @@ import '../agents/agent_role.dart';
 import '../agents/agent_runtime.dart';
 import '../models/model_provider.dart';
 import '../models/model_registry.dart';
+import '../observability/telemetry.dart';
 import '../tools/tool.dart';
 import 'capability_router.dart';
 import 'circuit_breaker.dart';
@@ -50,6 +51,7 @@ class SupervisorEngine {
     this.maxAttemptsPerNode = 3,
     this.lowConfidenceThreshold = 0.5,
     this.onEvent,
+    this.telemetry,
   });
 
   final TaskGraph graph;
@@ -62,6 +64,10 @@ class SupervisorEngine {
   final int maxAttemptsPerNode;
   final double lowConfidenceThreshold;
   final AgentEventSink? onEvent;
+
+  /// Optional Neural Observatory instrumentation shared by every worker
+  /// runtime — null by default (pre-Observatory behaviour preserved).
+  final AgentTelemetry? telemetry;
 
   /// Runs every dispatchable node until the graph completes, hits an
   /// unrecoverable failure, exhausts its token budget, or stalls (ready
@@ -111,6 +117,7 @@ class SupervisorEngine {
         gateway: gatewayFor(node),
         registry: modelRegistry,
         onEvent: onEvent,
+        telemetry: telemetry,
       );
 
       final priorNote = node.attempts > 1 ? 'Previous attempt failed: ${node.failureReason}' : null;

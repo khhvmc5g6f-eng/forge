@@ -1,6 +1,7 @@
 import '../models/chat_types.dart';
 import '../models/model_provider.dart';
 import '../models/model_registry.dart';
+import '../observability/telemetry.dart';
 import '../security/untrusted_content.dart';
 import '../tools/tool.dart';
 import 'agent_role.dart';
@@ -62,6 +63,8 @@ class AgentRuntime {
     required this.gateway,
     required this.registry,
     this.onEvent,
+    this.telemetry,
+    this.parentAgentId,
   });
 
   final String agentId;
@@ -71,6 +74,16 @@ class AgentRuntime {
   final ToolGateway gateway;
   final ModelRegistry registry;
   final AgentEventSink? onEvent;
+
+  /// Optional Neural Observatory instrumentation. When null (the default —
+  /// every pre-existing constructor call), the runtime behaves exactly as
+  /// before; when wired, the runtime reports agent/model/tool events with
+  /// real measured latencies and provider-reported token counts.
+  final AgentTelemetry? telemetry;
+
+  /// The delegating agent's id when this runtime is a subagent — the
+  /// execution-graph edge. Null for top-level agents.
+  final String? parentAgentId;
 
   void _emit(String message) => onEvent?.call(AgentEvent(agentId, definition.role, message));
 
@@ -95,6 +108,11 @@ class AgentRuntime {
     var usage = const TokenUsage.zero();
 
     _emit('started: $taskPrompt');
+    telemetry?.agentStarted(
+      agentId: agentId,
+      role: definition.role.name,
+      parentAgentId: parentAgentId,
+    );
 
     for (var iteration = 0; iteration < definition.maxIterations; iteration++) {
       final modelId = ModelId(providerId: provider.providerId, modelName: modelName);
@@ -112,6 +130,18 @@ class AgentRuntime {
           latencyMs: DateTime.now().difference(started).inMilliseconds,
           rateLimited: e is ModelProviderException && e.rateLimited,
         );
+        telemetry?.modelRequest(
+          agentId: agentId,
+          role: definition.role.name,
+          providerId: provider.providerId,
+          modelName: modelName,
+          latencyMs: DateTime.now().difference(started).inMilliseconds,
+          succeeded: false,
+          rateLimited: e is ModelProviderException && e.rateLimited,
+          promptTokens: 0,
+          completionTokens: 0,
+          cachedPromptTokens: 0,
+        );
         _emit('model call failed: $e');
         rethrow;
       }
@@ -120,12 +150,32 @@ class AgentRuntime {
         succeeded: true,
         latencyMs: DateTime.now().difference(started).inMilliseconds,
       );
+      telemetry?.modelRequest(
+        agentId: agentId,
+        role: definition.role.name,
+        providerId: provider.providerId,
+        modelName: modelName,
+        latencyMs: DateTime.now().difference(started).inMilliseconds,
+        succeeded: true,
+        promptTokens: result.usage.promptTokens,
+        completionTokens: result.usage.completionTokens,
+        cachedPromptTokens: result.usage.cachedPromptTokens,
+      );
       usage += result.usage;
       messages.add(result.message);
 
       if (result.finishReason != FinishReason.toolCalls ||
           result.message.toolCalls.isEmpty) {
         _emit('completed after ${iteration + 1} iteration(s)');
+        telemetry?.agentFinished(
+          agentId: agentId,
+          role: definition.role.name,
+          status: 'ok',
+          iterations: iteration + 1,
+          promptTokens: usage.promptTokens,
+          completionTokens: usage.completionTokens,
+          cachedPromptTokens: usage.cachedPromptTokens,
+        );
         return AgentReport(
           agentId: agentId,
           role: definition.role,
@@ -140,6 +190,7 @@ class AgentRuntime {
         _emit('tool call: ${call.name}(${call.arguments})');
         UntrustedContent content;
         var isError = false;
+        final toolWatch = Stopwatch()..start();
         try {
           content = await gateway.invoke(call.name, call.arguments);
         } catch (e) {
@@ -147,6 +198,15 @@ class AgentRuntime {
           content = UntrustedContent(
             source: ContentSource.toolResult,
             body: 'ERROR: $e',
+          );
+        } finally {
+          telemetry?.toolCall(
+            agentId: agentId,
+            role: definition.role.name,
+            toolName: call.name,
+            durationMs: toolWatch.elapsedMilliseconds,
+            succeeded: !isError,
+            decision: isError ? 'error' : 'allow',
           );
         }
         toolResults.add(content);
@@ -159,6 +219,15 @@ class AgentRuntime {
       }
     }
 
+    telemetry?.agentFinished(
+      agentId: agentId,
+      role: definition.role.name,
+      status: 'error',
+      iterations: definition.maxIterations,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      cachedPromptTokens: usage.cachedPromptTokens,
+    );
     throw AgentRuntimeException(
       'Agent ${definition.role.name} exceeded ${definition.maxIterations} iterations without completing.',
     );

@@ -24,6 +24,10 @@ import '../core/models/providers/additional_providers.dart';
 import '../core/models/providers/anthropic_provider.dart';
 import '../core/models/providers/local_providers.dart';
 import '../core/models/providers/nvidia_nim_provider.dart';
+import '../core/observability/counting_http_client.dart';
+import '../core/observability/observatory_service.dart';
+import '../core/observability/resource_sampler.dart';
+import '../core/observability/telemetry_store.dart';
 import '../core/security/keychain_secrets_store.dart';
 import '../core/security/secrets_store.dart';
 import '../core/tasks/task_manager.dart';
@@ -100,24 +104,83 @@ final ollamaRuntimeProvider = Provider<OllamaRuntime>((ref) {
   return runtime;
 });
 
+// ── Neural Observatory (lib/core/observability/) ─────────────────────────
+// One shared telemetry service beneath the entire application: the
+// in-session panel, the Observatory workspace, the CLI and the
+// self-improvement engine all read this same instance, so a diagnostic
+// seen in one surface is the same data every other surface shows.
+
+/// Host resource sampling: process CPU/RSS via `ps` (measured); GPU is
+/// reported honestly as unavailable until a real telemetry source for
+/// one is wired.
+final resourceSamplerProvider = Provider<ResourceSampler>(
+    (ref) => ResourceSampler());
+
+final Provider<ObservatoryService> observatoryServiceProvider =
+    Provider<ObservatoryService>((ref) {
+  final service = ObservatoryService(
+    telemetryStore: JsonlTelemetryStore(ref.watch(projectRootProvider)),
+  );
+  final circuitBreakers = ref.watch(circuitBreakerRegistryProvider);
+  // Provider/key health comes from the Control Plane — masked internal
+  // references only; the credential itself never crosses this boundary.
+  service.providerStatusReader = () {
+    final providerIds = ref.read(allModelProvidersProvider).keys;
+    final rows = <ProviderStatusRow>[];
+    for (final providerId in providerIds) {
+      final breaker = circuitBreakers
+          .breakerFor(CapabilityRouter.providerCircuitId(providerId));
+      rows.add(ProviderStatusRow(
+        providerId: providerId,
+        keyRef: 'primary',
+        circuitState: breaker.state.name,
+        requests: breaker.totalRequests,
+        failures: breaker.totalFailures,
+        rateLimited: breaker.total429s,
+        averageLatencyMs: breaker.averageLatency.inMilliseconds,
+      ));
+    }
+    return rows;
+  };
+  return service;
+});
+
+/// Passive network byte counting for every provider request — the same
+/// adapters, wrapped once, so the Observatory measures real application
+/// traffic (never presented as the user's connection speed).
+final Provider<CountingHttpClient> countingHttpClientProvider =
+    Provider<CountingHttpClient>((ref) {
+  final observatory = ref.watch(observatoryServiceProvider);
+  return CountingHttpClient(
+    onTraffic: (bytesOut, bytesIn, url, at) => observatory.recordNetworkTraffic(
+      bytesOut: bytesOut,
+      bytesIn: bytesIn,
+      url: url,
+    ),
+  );
+});
+
 /// Every configured provider adapter, keyed by provider id — the Control
 /// Plane's "federated" fleet: NVIDIA NIM, Groq, Cerebras, OpenRouter, Z.AI,
-/// Google, Anthropic, OpenAI, and local (Ollama/LM Studio). Used by the
-/// Models panel's refresh actions, the Control Centre, and
-/// `SupervisorEngine.resolveProvider`.
-final allModelProvidersProvider = Provider<Map<String, ModelProvider>>((ref) {
+/// Google, Anthropic, OpenAI, and local (Ollama/LM Studio). All HTTP goes
+/// through [countingHttpClientProvider] so the Observatory passively
+/// measures real traffic. Used by the Models panel's refresh actions, the
+/// Control Centre, and `SupervisorEngine.resolveProvider`.
+final Provider<Map<String, ModelProvider>> allModelProvidersProvider =
+    Provider<Map<String, ModelProvider>>((ref) {
   final secrets = ref.watch(secretsStoreProvider);
+  final http = ref.watch(countingHttpClientProvider);
   return {
-    'nvidia-nim': NvidiaNimProvider(secretsStore: secrets),
-    'groq': GroqProvider(secretsStore: secrets),
-    'cerebras': CerebrasProvider(secretsStore: secrets),
-    'openrouter': OpenRouterProvider(secretsStore: secrets),
-    'zai': ZaiProvider(secretsStore: secrets),
-    'google': GoogleProvider(secretsStore: secrets),
-    'anthropic': AnthropicProvider(secretsStore: secrets),
-    'openai': OpenAiProvider(secretsStore: secrets),
-    'ollama': OllamaProvider(secretsStore: secrets),
-    'lm-studio': LmStudioProvider(secretsStore: secrets),
+    'nvidia-nim': NvidiaNimProvider(secretsStore: secrets, httpClient: http),
+    'groq': GroqProvider(secretsStore: secrets, httpClient: http),
+    'cerebras': CerebrasProvider(secretsStore: secrets, httpClient: http),
+    'openrouter': OpenRouterProvider(secretsStore: secrets, httpClient: http),
+    'zai': ZaiProvider(secretsStore: secrets, httpClient: http),
+    'google': GoogleProvider(secretsStore: secrets, httpClient: http),
+    'anthropic': AnthropicProvider(secretsStore: secrets, httpClient: http),
+    'openai': OpenAiProvider(secretsStore: secrets, httpClient: http),
+    'ollama': OllamaProvider(secretsStore: secrets, httpClient: http),
+    'lm-studio': LmStudioProvider(secretsStore: secrets, httpClient: http),
   };
 });
 

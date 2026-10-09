@@ -6,6 +6,7 @@ import '../models/model_provider.dart';
 import '../models/model_registry.dart';
 import '../models/model_router.dart';
 import '../models/task_classifier.dart';
+import '../observability/telemetry.dart';
 import '../tools/tool.dart';
 import 'agent_role.dart';
 import 'agent_runtime.dart';
@@ -62,6 +63,7 @@ class AgentOrchestrator {
     this.budget = const SubagentBudget(),
     this.onEvent,
     this.onModelOutcome,
+    this.telemetry,
     Map<AgentRole, AgentDefinition>? definitions,
   }) : definitions = definitions ?? defaultAgentDefinitions;
 
@@ -86,6 +88,12 @@ class AgentOrchestrator {
   /// circuit-breaker state. `null` (the default) keeps this class fully
   /// independent of the control-plane layer.
   final void Function(ModelId modelId, Object? error)? onModelOutcome;
+
+  /// Optional Neural Observatory instrumentation shared by every spawned
+  /// agent — null by default, preserving the pre-Observatory behaviour of
+  /// every existing construction site.
+  final AgentTelemetry? telemetry;
+
   final Map<AgentRole, AgentDefinition> definitions;
 
   final _uuid = const Uuid();
@@ -100,7 +108,8 @@ class AgentOrchestrator {
   /// Runs one subagent for [request] at recursion [depth] (0 = top-level,
   /// spawned directly by the orchestrating task rather than by another
   /// agent).
-  Future<AgentReport> spawn(SubagentRequest request, {int depth = 0}) async {
+  Future<AgentReport> spawn(SubagentRequest request,
+      {int depth = 0, String? parentAgentId}) async {
     if (_cancelled) {
       throw SubagentBudgetExceededException('Orchestrator run was cancelled.');
     }
@@ -133,6 +142,8 @@ class AgentOrchestrator {
       gateway: gatewayFor(request.role),
       registry: registry,
       onEvent: onEvent,
+      telemetry: telemetry,
+      parentAgentId: parentAgentId,
     );
 
     onEvent?.call(AgentEvent(
