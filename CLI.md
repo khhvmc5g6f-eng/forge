@@ -18,6 +18,7 @@ standalone `forge` binary. The brief's example name `aiwork` is a straightforwar
 | `models` | `forge models` | Lists every model NVIDIA NIM currently reports, with capability/availability flags |
 | `mcp list [--dir]` | `forge mcp list` | Connects to every server in `.forge/mcp.json` and lists discovered tools |
 | `status [--dir]` | `forge status` | Project path, Git branch/changed-file count, and the ten most recent tasks |
+| `cloud` | `forge cloud` | Whether Forge Cloud is configured (`FORGE_CLOUD_URL`); prints "Forge Cloud not configured" when unset |
 | `resume [--dir]` | `forge resume` | Lists tasks in `running`/`blocked` state — the "RESUME TASK" recovery flow after a restart |
 
 All commands accept `--dir <path>` (default: current working directory) where a project

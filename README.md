@@ -2,7 +2,7 @@
 
 Forge is a standalone, provider-independent AI software-engineering workstation for macOS
 (with a portable core that also runs on Linux/Windows for development). It combines the
-strongest architectural patterns from Claude Code, Codex CLI, Cline, Roo Code, Continue,
+strongest architectural patterns from Claude Code, Codex CLI, Roo Code, Continue,
 Aider, NVIDIA NIM, and MCP into one observable, recoverable, extensible development
 environment — see [`RESEARCH_FINDINGS.md`](RESEARCH_FINDINGS.md) for the prior-art survey
 behind these choices.
@@ -126,7 +126,6 @@ and does not work outside macOS.
 | [`PROVIDERS.md`](PROVIDERS.md) | Model provider abstraction, secrets |
 | [`NVIDIA.md`](NVIDIA.md) | NVIDIA NIM integration specifics |
 | [`CONTROL_PLANE.md`](CONTROL_PLANE.md) | Multi-provider circuit breakers, tiers, Task Graph/Supervisor engine, LiteLLM decision |
-| [`CLINE_AUDIT.md`](CLINE_AUDIT.md) | What was reused/adapted/rejected from Cline before building the Control Plane |
 | [`CLAUDE_REVIEW.md`](CLAUDE_REVIEW.md) | Independent review + Claude Final Review pipeline |
 | [`NEURAL_OBSERVATORY.md`](NEURAL_OBSERVATORY.md) | The Observatory telemetry subsystem: sessions, spans, health, model intelligence, self-improvement gates |
 | [`CLI.md`](CLI.md) | `forge`/`aiwork` command reference |

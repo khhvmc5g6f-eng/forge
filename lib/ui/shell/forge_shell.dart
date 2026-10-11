@@ -16,6 +16,7 @@ import '../panels/projects_panel.dart';
 import '../panels/settings_panel.dart';
 import '../panels/tasks_panel.dart';
 import '../panels/terminal_panel.dart';
+import '../panels/wallet_panel.dart';
 import 'sidebar_section.dart';
 
 final selectedSectionProvider = StateProvider<SidebarSection>((ref) => SidebarSection.tasks);
@@ -112,6 +113,8 @@ class ForgeShell extends ConsumerWidget {
         return const ObservatoryPanel();
       case SidebarSection.diagnostics:
         return const DiagnosticsPanel();
+      case SidebarSection.wallet:
+        return const WalletPanel();
       case SidebarSection.settings:
         return const SettingsPanel();
     }
