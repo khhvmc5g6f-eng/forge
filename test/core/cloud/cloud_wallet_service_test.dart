@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:forge/core/cloud/cloud_models.dart';
 import 'package:forge/core/cloud/cloud_wallet_service.dart';
 import 'package:forge/core/cloud/forge_cloud_client.dart';
 import 'package:forge/core/security/secrets_store.dart';

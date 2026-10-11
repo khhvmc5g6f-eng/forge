@@ -122,7 +122,7 @@ class ForgeCloudClient {
     try {
       final response =
           await _http.get(_uri(path), headers: headers).timeout(timeout);
-      return _decode(response);
+      return await _decode(response);
     } on TimeoutException {
       throw ForgeCloudException('Forge Cloud request timed out.');
     } on http.ClientException catch (e) {
@@ -140,7 +140,7 @@ class ForgeCloudClient {
       final response = await _http
           .post(_uri(path), headers: headers, body: jsonEncode(body))
           .timeout(timeout);
-      return _decode(response);
+      return await _decode(response);
     } on TimeoutException {
       throw ForgeCloudException('Forge Cloud request timed out.');
     } on http.ClientException catch (e) {
