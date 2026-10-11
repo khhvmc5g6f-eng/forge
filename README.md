@@ -2,7 +2,7 @@
 
 Forge is a standalone, provider-independent AI software-engineering workstation for macOS
 (with a portable core that also runs on Linux/Windows for development). It combines the
-strongest architectural patterns from Claude Code, Codex CLI, Cline, Roo Code, Continue,
+strongest architectural patterns from Claude Code, Codex CLI, Roo Code, Continue,
 Aider, NVIDIA NIM, and MCP into one observable, recoverable, extensible development
 environment — see [`RESEARCH_FINDINGS.md`](RESEARCH_FINDINGS.md) for the prior-art survey
 behind these choices.
@@ -21,6 +21,12 @@ verification against real external services:
 - Provider-agnostic model layer: NVIDIA NIM, OpenAI, Ollama, LM Studio, Anthropic adapters
   (`lib/core/models/`) — `forge models` performs a real, live call to NVIDIA's public
   `/v1/models` endpoint and lists the current catalogue.
+- **Azure AI Foundry provider and optional Forge Cloud client** — `AzureFoundryProvider`
+  (`lib/core/models/providers/azure_foundry_provider.dart`) and a typed Forge Cloud client
+  with a wallet and usage panel (`lib/core/cloud/`, `lib/ui/panels/wallet_panel.dart`).
+  Both are opt-in; local models, BYOK and every other provider work with no cloud. See
+  [`AZURE.md`](AZURE.md). Written without a Dart toolchain available, so not yet verified
+  by `flutter analyze` / `flutter test`.
 - **Built-in local-model runtime** (`lib/core/local_models/`) — Forge owns the Ollama
   stack end-to-end: the server binary is provisioned under `~/.forge/runtime/ollama/bin`,
   pulled models live under `~/.forge/runtime/ollama/models` (never `~/.ollama`), and the
@@ -124,9 +130,9 @@ and does not work outside macOS.
 | [`TOOLS.md`](TOOLS.md) | Tool Gateway, Policy Engine, command classification |
 | [`MCP.md`](MCP.md) | MCP client/manager, trust model |
 | [`PROVIDERS.md`](PROVIDERS.md) | Model provider abstraction, secrets |
+| [`AZURE.md`](AZURE.md) | Azure AI Foundry provider, Forge Cloud client, configuration, offline behaviour |
 | [`NVIDIA.md`](NVIDIA.md) | NVIDIA NIM integration specifics |
 | [`CONTROL_PLANE.md`](CONTROL_PLANE.md) | Multi-provider circuit breakers, tiers, Task Graph/Supervisor engine, LiteLLM decision |
-| [`CLINE_AUDIT.md`](CLINE_AUDIT.md) | What was reused/adapted/rejected from Cline before building the Control Plane |
 | [`CLAUDE_REVIEW.md`](CLAUDE_REVIEW.md) | Independent review + Claude Final Review pipeline |
 | [`NEURAL_OBSERVATORY.md`](NEURAL_OBSERVATORY.md) | The Observatory telemetry subsystem: sessions, spans, health, model intelligence, self-improvement gates |
 | [`CLI.md`](CLI.md) | `forge`/`aiwork` command reference |

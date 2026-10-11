@@ -18,6 +18,7 @@ enum SidebarSection {
   neuralLab(Icons.science_outlined, 'Neural Lab'),
   observatory(Icons.insights_outlined, 'Observatory'),
   diagnostics(Icons.monitor_heart_outlined, 'Diagnostics'),
+  wallet(Icons.account_balance_wallet_outlined, 'Wallet and usage'),
   settings(Icons.settings_outlined, 'Settings');
 
   const SidebarSection(this.icon, this.label);

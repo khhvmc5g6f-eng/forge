@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:meta/meta.dart';
 
 import '../../security/secrets_store.dart';
 import '../chat_types.dart';
@@ -48,11 +49,38 @@ class OpenAiCompatibleProvider implements ModelProvider {
 
   Uri _endpoint(String path) => config.baseUrl.resolve(path);
 
+  // Extension points for providers whose URL or auth scheme differs from the
+  // plain `<baseUrl>/chat/completions` + `Bearer` shape (see
+  // `azure_foundry_provider.dart`). The defaults preserve the original
+  // behaviour exactly, so every existing subclass is unaffected.
+
+  /// The injected HTTP client, for subclasses that need an extra request.
+  @protected
+  http.Client get httpClient => _http;
+
+  /// The injected secrets store, for subclasses that resolve their own
+  /// credentials.
+  @protected
+  SecretsStore get secrets => _secretsStore;
+
+  /// Headers sent with every request. Subclasses with a different auth
+  /// scheme override this.
+  @protected
+  Future<Map<String, String>> requestHeaders() => _headers();
+
+  /// URL of the chat-completions endpoint for [modelName].
+  @protected
+  Uri chatCompletionsUri(String modelName) => _endpoint('chat/completions');
+
+  /// URL of the model-listing endpoint.
+  @protected
+  Uri modelsUri() => _endpoint('models');
+
   @override
   Future<List<ModelDescriptor>> listModels() async {
-    final headers = await _headers();
+    final headers = await requestHeaders();
     final response = await _withRetry(() => _http.get(
-          _endpoint('models'),
+          modelsUri(),
           headers: headers,
         ));
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -87,9 +115,9 @@ class OpenAiCompatibleProvider implements ModelProvider {
   @override
   Future<ChatCompletionResult> chat(String modelName, ChatRequest request) async {
     final payload = _buildPayload(modelName, request, stream: false);
-    final headers = await _headers();
+    final headers = await requestHeaders();
     final response = await _withRetry(() => _http.post(
-          _endpoint('chat/completions'),
+          chatCompletionsUri(modelName),
           headers: headers,
           body: jsonEncode(payload),
         ));
@@ -100,8 +128,8 @@ class OpenAiCompatibleProvider implements ModelProvider {
   @override
   Stream<ChatStreamChunk> streamChat(String modelName, ChatRequest request) async* {
     final payload = _buildPayload(modelName, request, stream: true);
-    final req = http.Request('POST', _endpoint('chat/completions'));
-    req.headers.addAll(await _headers());
+    final req = http.Request('POST', chatCompletionsUri(modelName));
+    req.headers.addAll(await requestHeaders());
     req.body = jsonEncode(payload);
     final streamedResponse = await _http.send(req);
     if (streamedResponse.statusCode >= 400) {

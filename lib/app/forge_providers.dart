@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/cloud/cloud_wallet_service.dart';
+import '../core/cloud/forge_cloud_client.dart';
 import '../core/computer/computer_control_session.dart';
 import '../core/computer/computer_control_driver.dart';
 import '../core/context/repo_index.dart';
@@ -22,6 +24,7 @@ import '../core/models/model_registry.dart';
 import '../core/models/model_router.dart';
 import '../core/models/providers/additional_providers.dart';
 import '../core/models/providers/anthropic_provider.dart';
+import '../core/models/providers/azure_foundry_provider.dart';
 import '../core/models/providers/local_providers.dart';
 import '../core/models/providers/nvidia_nim_provider.dart';
 import '../core/observability/counting_http_client.dart';
@@ -77,6 +80,47 @@ final branchIsolationProvider = Provider<BranchIsolation>((ref) {
 
 final taskManagerProvider = Provider<TaskManager>((ref) {
   return TaskManager(FileTaskStore(ref.watch(projectRootProvider)));
+});
+
+// ── Azure and Forge Cloud (lib/core/cloud/, azure_foundry_provider.dart) ─
+// Both are opt-in. With nothing configured they are inert: the Azure
+// provider is absent from the fleet and the wallet service reports
+// "Forge Cloud not configured". See AZURE.md.
+
+/// Azure AI Foundry settings from FORGE_AZURE_FOUNDRY_* environment
+/// variables, or null when no endpoint is set. Override in tests.
+final azureFoundrySettingsProvider = Provider<AzureFoundrySettings?>(
+    (ref) => AzureFoundrySettings.fromEnvironment(Platform.environment));
+
+/// Forge Cloud base URL. Initialised from FORGE_CLOUD_URL; a Settings
+/// control can set it at runtime. Null means cloud features are disabled.
+final forgeCloudUrlProvider = StateProvider<Uri?>(
+    (ref) => parseForgeCloudUrl(Platform.environment[forgeCloudUrlEnvVar]));
+
+/// Typed Forge Cloud client, or null when [forgeCloudUrlProvider] is unset.
+final forgeCloudClientProvider = Provider<ForgeCloudClient?>((ref) {
+  final url = ref.watch(forgeCloudUrlProvider);
+  if (url == null) return null;
+  final client = ForgeCloudClient(
+    baseUrl: url,
+    secretsStore: ref.watch(secretsStoreProvider),
+    httpClient: ref.watch(countingHttpClientProvider),
+  );
+  return client;
+});
+
+/// What the Wallet and usage panel reads.
+final cloudWalletServiceProvider = Provider<CloudWalletService>((ref) {
+  final client = ref.watch(forgeCloudClientProvider);
+  if (client == null) return const NotConfiguredCloudWalletService();
+  return ForgeCloudWalletService(client);
+});
+
+/// Latest wallet snapshot; `ref.invalidate` to refresh. Only read when the
+/// service is configured.
+final walletSnapshotProvider =
+    FutureProvider.autoDispose<WalletSnapshot>((ref) {
+  return ref.watch(cloudWalletServiceProvider).refresh();
 });
 
 final modelRegistryProvider = Provider<ModelRegistry>((ref) => ModelRegistry());
@@ -162,7 +206,8 @@ final Provider<CountingHttpClient> countingHttpClientProvider =
 
 /// Every configured provider adapter, keyed by provider id — the Control
 /// Plane's "federated" fleet: NVIDIA NIM, Groq, Cerebras, OpenRouter, Z.AI,
-/// Google, Anthropic, OpenAI, and local (Ollama/LM Studio). All HTTP goes
+/// Google, Anthropic, OpenAI, local (Ollama/LM Studio), and, when configured,
+/// Azure AI Foundry. All HTTP goes
 /// through [countingHttpClientProvider] so the Observatory passively
 /// measures real traffic. Used by the Models panel's refresh actions, the
 /// Control Centre, and `SupervisorEngine.resolveProvider`.
@@ -170,6 +215,7 @@ final Provider<Map<String, ModelProvider>> allModelProvidersProvider =
     Provider<Map<String, ModelProvider>>((ref) {
   final secrets = ref.watch(secretsStoreProvider);
   final http = ref.watch(countingHttpClientProvider);
+  final azure = ref.watch(azureFoundrySettingsProvider);
   return {
     'nvidia-nim': NvidiaNimProvider(secretsStore: secrets, httpClient: http),
     'groq': GroqProvider(secretsStore: secrets, httpClient: http),
@@ -181,6 +227,14 @@ final Provider<Map<String, ModelProvider>> allModelProvidersProvider =
     'openai': OpenAiProvider(secretsStore: secrets, httpClient: http),
     'ollama': OllamaProvider(secretsStore: secrets, httpClient: http),
     'lm-studio': LmStudioProvider(secretsStore: secrets, httpClient: http),
+    // Present only when FORGE_AZURE_FOUNDRY_ENDPOINT is set.
+    if (azure != null)
+      AzureFoundryProvider.providerIdValue: AzureFoundryProvider(
+        secretsStore: secrets,
+        settings: azure,
+        environment: Platform.environment,
+        httpClient: http,
+      ),
   };
 });
 

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
+import '../core/cloud/forge_cloud_client.dart';
 import '../core/git/git_service.dart';
 import '../core/mcp/mcp_manager.dart';
 import '../core/models/chat_types.dart';
@@ -36,7 +37,8 @@ Future<int> runForgeCli(List<String> arguments) async {
     ..addCommand(McpCommand())
     ..addCommand(StatusCommand())
     ..addCommand(ResumeCommand())
-    ..addCommand(ObservatoryCommand());
+    ..addCommand(ObservatoryCommand())
+    ..addCommand(CloudCommand());
 
   try {
     final result = await runner.run(arguments);
@@ -489,3 +491,23 @@ class _ModelAggregate {
   final List<double> latencies = [];
 }
 
+
+class CloudCommand extends Command<int> {
+  @override
+  final name = 'cloud';
+  @override
+  final description = 'Show whether Forge Cloud is configured (FORGE_CLOUD_URL).';
+
+  @override
+  Future<int> run() async {
+    final url = parseForgeCloudUrl(Platform.environment[forgeCloudUrlEnvVar]);
+    if (url == null) {
+      stdout.writeln(forgeCloudNotConfiguredMessage);
+      return 0;
+    }
+    stdout.writeln('Forge Cloud: ${url.host}');
+    stdout.writeln(
+        'Wallet queries need a stored sign-in token; the CLI has no persistent secrets store yet.');
+    return 0;
+  }
+}
