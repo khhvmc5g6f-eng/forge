@@ -21,6 +21,12 @@ verification against real external services:
 - Provider-agnostic model layer: NVIDIA NIM, OpenAI, Ollama, LM Studio, Anthropic adapters
   (`lib/core/models/`) — `forge models` performs a real, live call to NVIDIA's public
   `/v1/models` endpoint and lists the current catalogue.
+- **Azure AI Foundry provider and optional Forge Cloud client** — `AzureFoundryProvider`
+  (`lib/core/models/providers/azure_foundry_provider.dart`) and a typed Forge Cloud client
+  with a wallet and usage panel (`lib/core/cloud/`, `lib/ui/panels/wallet_panel.dart`).
+  Both are opt-in; local models, BYOK and every other provider work with no cloud. See
+  [`AZURE.md`](AZURE.md). Written without a Dart toolchain available, so not yet verified
+  by `flutter analyze` / `flutter test`.
 - **Built-in local-model runtime** (`lib/core/local_models/`) — Forge owns the Ollama
   stack end-to-end: the server binary is provisioned under `~/.forge/runtime/ollama/bin`,
   pulled models live under `~/.forge/runtime/ollama/models` (never `~/.ollama`), and the
@@ -124,6 +130,7 @@ and does not work outside macOS.
 | [`TOOLS.md`](TOOLS.md) | Tool Gateway, Policy Engine, command classification |
 | [`MCP.md`](MCP.md) | MCP client/manager, trust model |
 | [`PROVIDERS.md`](PROVIDERS.md) | Model provider abstraction, secrets |
+| [`AZURE.md`](AZURE.md) | Azure AI Foundry provider, Forge Cloud client, configuration, offline behaviour |
 | [`NVIDIA.md`](NVIDIA.md) | NVIDIA NIM integration specifics |
 | [`CONTROL_PLANE.md`](CONTROL_PLANE.md) | Multi-provider circuit breakers, tiers, Task Graph/Supervisor engine, LiteLLM decision |
 | [`CLAUDE_REVIEW.md`](CLAUDE_REVIEW.md) | Independent review + Claude Final Review pipeline |

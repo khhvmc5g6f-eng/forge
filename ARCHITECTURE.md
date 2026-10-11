@@ -5,7 +5,8 @@
 ```
 lib/
   core/            # Platform-independent engine. No Flutter imports. Shared by GUI + CLI.
-    models/        # ModelProvider abstraction, adapters, registry, router, task classifier
+    models/        # ModelProvider abstraction, adapters (incl. providers/azure_foundry_provider.dart),
+                   # registry, router, task classifier
     tools/         # Tool interface, ToolGateway, PolicyEngine, command classifier, fs/terminal tools
     agents/        # AgentRole/AgentDefinition, AgentRuntime (shared ReAct loop), Orchestrator
     tasks/         # Task, TaskManager, TaskStore (disk-persisted, resumable)
@@ -19,6 +20,8 @@ lib/
     devices/       # DeviceManager + Adb/IosSimulator DeviceProviders, device Tools
     browser/       # Playwright MCP server config/bridge (browser automation via MCP)
     computer/      # ComputerControlSession (PAUSE/STOP/EMERGENCY STOP), driver + tools
+    cloud/         # Optional Forge Cloud client: device-code sign-in, wallet, usage, catalogue,
+                   # estimate; Money (integer nano units); CloudWalletService. Off unless FORGE_CLOUD_URL is set
   app/             # Riverpod providers wiring core services together for the GUI
   ui/              # Flutter widgets only — shell, panels. Never touches core internals directly
                     # except through app/forge_providers.dart.
@@ -90,6 +93,9 @@ extension without core changes:
   reviewer implements this to sit in the review pipeline.
 - `McpTransport` (`lib/core/mcp/mcp_transport.dart`) — additional MCP transports (HTTP/SSE)
   implement this alongside the existing `StdioMcpTransport`.
+- `CloudWalletService` (`lib/core/cloud/cloud_wallet_service.dart`) — what the UI reads for
+  Forge Cloud balance and usage; the not-configured implementation keeps every local feature
+  working with no cloud. See `AZURE.md`.
 - `SecretsStore` (`lib/core/security/secrets_store.dart`) — platform secret backends.
 
 None of these require touching the Orchestrator, the Policy Engine, or the UI shell to add

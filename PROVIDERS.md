@@ -21,7 +21,13 @@ capability-inference quirks:
 | Ollama | `providers/local_providers.dart` (`OllamaProvider`) | `http://localhost:11434/v1/`, always `isFree`/`isLocal` |
 | LM Studio | `providers/local_providers.dart` (`LmStudioProvider`) | `http://localhost:1234/v1/` |
 | Generic | `providers/local_providers.dart` (`GenericOpenAiCompatibleProvider`) | Any other OpenAI-compatible endpoint, fully user-configured |
+| Azure AI Foundry | `providers/azure_foundry_provider.dart` (`AzureFoundryProvider`) | Opt-in. Deployment-name addressing (`/openai/deployments/{deployment}/chat/completions?api-version=`) or the `/openai/v1/` surface; `api-key` header or Microsoft Entra ID bearer token. Endpoint, deployments and api-version come from `FORGE_AZURE_FOUNDRY_*` settings; the model list is configuration-driven, optionally extended by the Forge Cloud catalogue. See `AZURE.md` |
 | Anthropic | `providers/anthropic_provider.dart` | Not OpenAI-wire-compatible (distinct Messages API, `tool_use`/`tool_result` blocks, no models-list endpoint) — its own adapter, used both as an ordinary provider and as the Claude Final Reviewer |
+
+`OpenAiCompatibleProvider` exposes small protected hooks (`requestHeaders`,
+`chatCompletionsUri`, `modelsUri`) for providers whose URL or auth scheme differs from
+`<baseUrl>/chat/completions` with a `Bearer` key; their defaults are the original behaviour.
+`AzureFoundryProvider` is the only user of them so far.
 
 ## Capabilities and the registry
 
